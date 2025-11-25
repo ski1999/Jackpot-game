@@ -10,6 +10,13 @@ export interface Wire {
   multiplier: number; // How much it multiplies the current probability
 }
 
+export interface SlotSymbol {
+  id: string;
+  char: string;
+  color: string;
+  value: number;
+}
+
 export interface StageConfig {
   id: number;
   name: string;
@@ -20,11 +27,5 @@ export interface StageConfig {
   wireCount: number;
   jackpotReward: number;
   bgGradient: string;
-}
-
-export interface SlotSymbol {
-  id: string;
-  char: string;
-  color: string;
-  value: number;
+  symbolSet: SlotSymbol[];
 }
