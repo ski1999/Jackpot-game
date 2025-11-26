@@ -1,3 +1,4 @@
+
 export type ViewState = 'front' | 'back';
 
 export type WireStatus = 'intact' | 'cut';
@@ -7,6 +8,7 @@ export type SpinSpeed = 'SLOW' | 'NORMAL' | 'FAST';
 export interface GameSettings {
   volume: number;
   speed: SpinSpeed;
+  storyMode: boolean;
 }
 
 export interface Wire {

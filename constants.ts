@@ -1,3 +1,4 @@
+
 import { StageConfig, SlotSymbol, SpinSpeed } from './types';
 
 // --- Pixel Art Shapes (10x10) ---
@@ -190,4 +191,17 @@ export const WIRE_COLORS = [
   'bg-orange-800',
   'bg-gray-400',
   'bg-pink-800',
+];
+
+export const STORY_LOGS = [
+  "ENTRY #01: The animatronics... they seem to be watching me. I swear Foxy moved when the camera was off.",
+  "ENTRY #02: Someone tampered with the wiring in the back. The patterns don't match the schematics.",
+  "ENTRY #03: The smell coming from the suits... it's like something is rotting inside them.",
+  "ENTRY #04: I found a cassette tape hidden in the prize counter. It's just screaming.",
+  "ENTRY #05: IT'S ME. IT'S ME. IT'S ME. IT'S ME. IT'S ME. IT'S ME.",
+  "ENTRY #06: The power fluctuates when they get close. I have to keep the generator running.",
+  "ENTRY #07: I don't think I'm getting a paycheck this week. I don't think I'm leaving.",
+  "ENTRY #08: The doors are jammed. The phone line is dead. Only the machine works.",
+  "ENTRY #09: They aren't singing anymore. They are whispering my name.",
+  "ENTRY #10: I cut the red wire and heard a laugh. Not a mechanical one.",
 ];

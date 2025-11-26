@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, AlertTriangle, Zap, Coins, Scissors, RotateCcw, Skull, Trophy, Battery, Activity, Wrench } from 'lucide-react';
 import { Reel } from './components/Reel';
 import { Lever } from './components/Lever';
 import { SettingsPanel } from './components/SettingsPanel';
-import { STAGES, SYMBOL_SETS, WIRE_COLORS, SPEED_CONFIG } from './constants';
+import { STAGES, SYMBOL_SETS, WIRE_COLORS, SPEED_CONFIG, STORY_LOGS } from './constants';
 import { StageConfig, Wire, SlotSymbol, GameSettings } from './types';
 import { soundEngine } from './audio';
 
@@ -14,11 +15,16 @@ export default function App() {
   const [gameState, setGameState] = useState<'IDLE' | 'SPINNING' | 'JACKPOT' | 'GAME_OVER' | 'VICTORY'>('IDLE');
   const [view, setView] = useState<'front' | 'back'>('front');
   const [hasRevived, setHasRevived] = useState(false);
+  
+  // Story Mode States
+  const [showStory, setShowStory] = useState(false);
+  const [showCoinsBurst, setShowCoinsBurst] = useState(false);
+
   const currentStage = STAGES[stageIndex] || STAGES[0];
   const currentSymbols = useMemo(() => SYMBOL_SETS[currentStage.symbolSetId] || SYMBOL_SETS['PIZZERIA'], [currentStage]);
   
   // Game Settings State
-  const [settings, setSettings] = useState<GameSettings>({ volume: 0.5, speed: 'NORMAL' });
+  const [settings, setSettings] = useState<GameSettings>({ volume: 0.5, speed: 'NORMAL', storyMode: false });
   const [showSettings, setShowSettings] = useState(false);
 
   const [jackpotProb, setJackpotProb] = useState(currentStage.baseProb);
@@ -68,6 +74,20 @@ export default function App() {
     initStage(currentStage);
   }, [stageIndex, initStage]);
 
+  const advanceStage = useCallback(() => {
+    if (stageIndex + 1 < STAGES.length) {
+       setStageIndex(prev => prev + 1);
+       setGameState('IDLE');
+       setView('front');
+       setShowStory(false);
+       setShowCoinsBurst(false);
+    } else {
+       setMessage("SHIFT COMPLETE. YOU SURVIVED.");
+       setGameState('VICTORY');
+       soundEngine.playJackpot();
+    }
+  }, [stageIndex]);
+
   const handleSpin = () => {
     if (gameState !== 'IDLE') return;
 
@@ -89,17 +109,20 @@ export default function App() {
           setMessage("CRITICAL SUCCESS. ADVANCING.");
           soundEngine.playJackpot();
           
-          setTimeout(() => {
-             if (stageIndex + 1 < STAGES.length) {
-               setStageIndex(prev => prev + 1);
-               setGameState('IDLE');
-               setView('front');
-             } else {
-               setMessage("SHIFT COMPLETE. YOU SURVIVED.");
-               setGameState('VICTORY');
-               soundEngine.playJackpot();
-             }
-          }, 3500);
+          if (settings.storyMode) {
+             // Sequence: Coins first, then Story Log
+             setShowCoinsBurst(true);
+             setTimeout(() => {
+                 setShowCoinsBurst(false);
+                 setShowStory(true);
+             }, 1200);
+             // Note: No auto advance, waits for user click
+          } else {
+             // Standard Mode: Auto advance
+             setTimeout(() => {
+               advanceStage();
+             }, 3500);
+          }
         }, speedConfig.reelDelay * 3); // Wait for reels to settle visually
       } else {
         const jackpotId = currentSymbols[currentSymbols.length - 1].id;
@@ -158,6 +181,8 @@ export default function App() {
     setHasRevived(false);
     setGameState('IDLE');
     setView('front');
+    setShowStory(false);
+    setShowCoinsBurst(false);
   };
 
   const handleRevive = () => {
@@ -168,7 +193,17 @@ export default function App() {
     setHasRevived(true);
     setGameState('IDLE');
     setView('front');
+    setShowStory(false);
+    setShowCoinsBurst(false);
     initStage(currentStage);
+  };
+
+  const handleStoryClick = () => {
+     if (showStory) {
+         soundEngine.playClick();
+         setShowStory(false);
+         advanceStage();
+     }
   };
 
   const formatProb = (p: number) => {
@@ -181,6 +216,11 @@ export default function App() {
       
       {/* Dark Vignette */}
       <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_0%,black_90%)] pointer-events-none z-10" />
+
+      {/* Story Mode Overlay - Click Anywhere to Dismiss */}
+      {showStory && (
+          <div className="fixed inset-0 z-[100] cursor-pointer" onClick={handleStoryClick}></div>
+      )}
 
       {/* HUD */}
       <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-40 pointer-events-none text-green-500 font-mono">
@@ -223,7 +263,7 @@ export default function App() {
         >
           
           {/* ================= FRONT FACE ================= */}
-          <div className="absolute inset-0 backface-hidden p-6 flex flex-col items-center shadow-2xl bg-zinc-900 border-x-8 border-y-8 border-black">
+          <div className="absolute inset-0 backface-hidden p-4 flex flex-col items-center shadow-2xl bg-zinc-900 border-x-8 border-y-8 border-black">
              {/* Dirt Overlay */}
              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-felt.png')] opacity-30 pointer-events-none" />
 
@@ -234,13 +274,13 @@ export default function App() {
              />
 
              {/* Machine Header */}
-             <div className="w-full bg-black border-4 border-zinc-800 p-4 mb-4 text-center shadow-inner relative overflow-hidden">
+             <div className="w-full bg-black border-4 border-zinc-800 p-4 mb-2 text-center shadow-inner relative overflow-hidden">
                <h2 className="text-3xl retro-font text-red-600 animate-pulse drop-shadow-[0_0_5px_red]">FAZ-SLOTS</h2>
                <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
              </div>
 
              {/* Display Panel - Green Terminal Look */}
-             <div className="w-full bg-black border-4 border-zinc-700 p-2 mb-4 grid grid-cols-2 gap-2 relative overflow-hidden font-mono">
+             <div className="w-full bg-black border-4 border-zinc-700 p-2 mb-2 grid grid-cols-2 gap-2 relative overflow-hidden font-mono">
                <div className="absolute inset-0 bg-green-500/5 pointer-events-none"></div>
                
                <div className="flex flex-col items-center justify-center border-r border-zinc-800">
@@ -258,14 +298,14 @@ export default function App() {
              </div>
 
              {/* Message Bar */}
-             <div className="h-12 mb-4 w-full flex items-center justify-center bg-black border-2 border-zinc-800 px-2 font-mono">
+             <div className="h-10 mb-2 w-full flex items-center justify-center bg-black border-2 border-zinc-800 px-2 font-mono">
                 <p className="text-sm text-green-500 animate-pulse text-center truncate uppercase">
                   {">"} {message} <span className="animate-blink">_</span>
                 </p>
              </div>
 
              {/* Reels */}
-             <div className="flex justify-center gap-1 md:gap-2 bg-zinc-950 p-4 border-8 border-black shadow-[inset_0_0_20px_black] mb-6">
+             <div className="flex justify-center gap-1 md:gap-2 bg-zinc-950 p-4 border-8 border-black shadow-[inset_0_0_20px_black] mb-2">
                <Reel 
                  spinning={gameState === 'SPINNING'} 
                  targetSymbol={reelTargets ? reelTargets[0] : null} 
@@ -290,7 +330,7 @@ export default function App() {
              </div>
 
              {/* Maintenance Button (Distinct from Settings) */}
-             <div className="mt-auto w-full flex justify-between items-center px-2">
+             <div className="w-full flex justify-between items-center px-2 mb-2">
                 <div className="text-[10px] text-zinc-600 max-w-[120px] font-mono">
                    PULL LEVER TO START SHIFT
                 </div>
@@ -298,12 +338,90 @@ export default function App() {
                 <button 
                   onClick={toggleView}
                   disabled={gameState !== 'IDLE'}
-                  className="group relative p-3 bg-zinc-800 hover:bg-zinc-700 border-2 border-black text-white shadow-lg active:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="group relative p-2 md:p-3 bg-zinc-800 hover:bg-zinc-700 border-2 border-black text-white shadow-lg active:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   title="Maintenance Panel"
                 >
                   <span className="text-[10px] font-mono hidden md:inline">REAR ACCESS</span>
-                  <Wrench className="w-5 h-5 group-hover:-rotate-12 transition-transform duration-300 text-zinc-400" />
+                  <Wrench className="w-4 h-4 group-hover:-rotate-12 transition-transform duration-300 text-zinc-400" />
                 </button>
+             </div>
+
+             {/* Prize Drawer */}
+             <div className="w-full mt-auto h-20 bg-zinc-950 border-t-4 border-black relative flex justify-center items-end shadow-inner">
+                {/* Chute Plate */}
+                <div className="w-3/4 h-12 bg-zinc-800 border-x-4 border-t-4 border-black rounded-t-lg relative flex justify-center items-center overflow-visible shadow-lg">
+                    {/* Dark Slot Opening */}
+                    <div className="w-3/4 h-3 bg-black rounded-full shadow-[inset_0_1px_3px_rgba(255,255,255,0.1)] translate-y-2 border-b border-zinc-700 relative z-10"></div>
+                    
+                    {/* Coin Fountain / Story Note Animation */}
+                    <AnimatePresence>
+                      {/* Case 1: Story Mode Note (Appears after coins in story mode) */}
+                      {gameState === 'JACKPOT' && settings.storyMode && showStory && (
+                          <motion.div
+                            key="story-note"
+                            initial={{ y: 50, rotate: -5, opacity: 0 }}
+                            animate={{ y: -40, rotate: 2, opacity: 1 }}
+                            exit={{ y: 50, opacity: 0 }}
+                            transition={{ type: "spring", stiffness: 120, damping: 12 }}
+                            className="absolute bottom-2 left-1/2 -translate-x-1/2 w-48 md:w-56 bg-[#f3e5ab] text-black p-3 text-[10px] md:text-xs font-mono shadow-2xl z-[110] leading-tight cursor-pointer"
+                            onClick={handleStoryClick}
+                            style={{
+                              clipPath: "polygon(2% 0, 95% 5%, 100% 95%, 5% 100%, 0 10%)",
+                              backgroundImage: "repeating-linear-gradient(transparent, transparent 18px, #ccc 19px)"
+                            }}
+                          >
+                            <div className="absolute top-0 right-0 w-8 h-8 bg-red-800 rounded-full blur-md opacity-60 mix-blend-multiply pointer-events-none" />
+                            <div className="absolute bottom-2 left-2 w-4 h-4 bg-red-900 rounded-full blur-sm opacity-70 mix-blend-multiply pointer-events-none" />
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/crinkled-paper.png')] opacity-50 pointer-events-none"></div>
+                            
+                            <p className="relative z-10 font-bold opacity-80 uppercase text-zinc-800">
+                              {STORY_LOGS[stageIndex % STORY_LOGS.length] || "DATA CORRUPTED"}
+                            </p>
+                            <div className="mt-2 text-[8px] text-zinc-500 font-bold text-right animate-pulse">
+                               CLICK TO CONTINUE...
+                            </div>
+                          </motion.div>
+                      )}
+
+                      {/* Case 2: Coins (Show if NOT story mode OR if story mode coins burst is active) */}
+                      {gameState === 'JACKPOT' && (!settings.storyMode || showCoinsBurst) && (
+                          <motion.div 
+                            key="coins-container"
+                            initial={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute bottom-4 left-1/2 -translate-x-1/2 w-0 h-0 flex items-end justify-center overflow-visible z-0"
+                          >
+                             {Array.from({ length: 25 }).map((_, i) => (
+                                <motion.div
+                                  key={i}
+                                  initial={{ y: 0, x: 0, scale: 0.5, opacity: 0 }}
+                                  animate={{ 
+                                    y: [0, -100 - Math.random() * 80, 50], 
+                                    x: [0, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 250],
+                                    rotate: [0, Math.random() * 1080],
+                                    scale: [0.5, 1, 0.8],
+                                    opacity: [1, 1, 0] 
+                                  }}
+                                  transition={{ 
+                                    duration: 1.5 + Math.random(), 
+                                    delay: Math.random() * 0.5,
+                                    ease: "circOut",
+                                    repeat: Infinity,
+                                    repeatDelay: 0.2
+                                  }}
+                                  className="absolute w-8 h-8 bg-yellow-500 rounded-full border-4 border-yellow-700 shadow-xl flex items-center justify-center"
+                                >
+                                  <div className="w-5 h-5 border border-yellow-300 rounded-full opacity-50" />
+                                </motion.div>
+                             ))}
+                          </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Industrial Details */}
+                    <div className="absolute -bottom-1 left-2 w-1.5 h-1.5 bg-zinc-500 rounded-full shadow-inner" />
+                    <div className="absolute -bottom-1 right-2 w-1.5 h-1.5 bg-zinc-500 rounded-full shadow-inner" />
+                </div>
              </div>
           </div>
 

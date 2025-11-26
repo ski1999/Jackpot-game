@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, Volume2, VolumeX, Gauge } from 'lucide-react';
+import { X, Volume2, VolumeX, Gauge, BookOpen } from 'lucide-react';
 import { SpinSpeed, GameSettings } from '../types';
 
 interface SettingsPanelProps {
@@ -75,6 +76,33 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                  </button>
                ))}
              </div>
+          </div>
+
+          {/* Story Mode Toggle */}
+          <div className="space-y-2">
+             <label className="text-xs text-green-700 font-mono uppercase block">Narrative Protocol</label>
+             <div className="flex items-center justify-between bg-black border border-zinc-800 p-2">
+                <div className="flex items-center gap-2 text-zinc-400 text-sm font-mono">
+                   <BookOpen className="w-4 h-4" />
+                   STORY MODE
+                </div>
+                <button
+                   onClick={() => onUpdate({ ...settings, storyMode: !settings.storyMode })}
+                   className={`
+                     relative w-12 h-6 transition-colors border
+                     ${settings.storyMode ? 'bg-green-900 border-green-600' : 'bg-zinc-900 border-zinc-700'}
+                   `}
+                >
+                   <motion.div 
+                     initial={false}
+                     animate={{ x: settings.storyMode ? 24 : 0 }}
+                     className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white shadow-sm ${settings.storyMode ? 'bg-green-400' : 'bg-zinc-500'}`}
+                   />
+                </button>
+             </div>
+             <p className="text-[10px] text-zinc-600 font-mono">
+               {settings.storyMode ? "PRIZE DRAWER WILL DISPENSE ARCHIVED LOGS." : "PRIZE DRAWER WILL DISPENSE BONUS TOKENS."}
+             </p>
           </div>
         </div>
 
