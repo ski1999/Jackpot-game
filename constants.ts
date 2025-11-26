@@ -77,7 +77,6 @@ const PIXEL_SHAPES = {
     "0001111000"
   ],
   // Reuse shapes for other themes with different colors for now to save space
-  // In a full game, each would have unique shapes
   BATTERY: [
     "0000110000",
     "0011111100",
@@ -101,6 +100,18 @@ const PIXEL_SHAPES = {
     "0001111000",
     "0001111000",
     "0001111000"
+  ],
+  BOMB: [
+    "0000011000",
+    "0000100100",
+    "0001111110",
+    "0011111111",
+    "0111111111",
+    "0111111111",
+    "0111111111",
+    "0011111111",
+    "0001111110",
+    "0000000000"
   ]
 };
 
@@ -138,6 +149,13 @@ export const SYMBOL_SETS: Record<string, SlotSymbol[]> = {
     { id: 'invader', color: '#22c55e', value: 40, shape: PIXEL_SHAPES.SKULL },
     { id: 'balloon', color: '#dc2626', value: 50, shape: PIXEL_SHAPES.CUPCAKE },
     { id: 'prize', color: '#a855f7', value: 100, shape: PIXEL_SHAPES.BEAR },
+  ],
+  // Multiplayer Specific Sets
+  EXPLOSION: [
+     { id: 'safe1', color: '#22c55e', value: 1, shape: PIXEL_SHAPES.BATTERY },
+     { id: 'safe2', color: '#eab308', value: 1, shape: PIXEL_SHAPES.HOOK },
+     { id: 'safe3', color: '#3b82f6', value: 1, shape: PIXEL_SHAPES.MIC },
+     { id: 'bomb', color: '#dc2626', value: 0, shape: PIXEL_SHAPES.BOMB }, // The "Jackpot"
   ]
 };
 
@@ -204,4 +222,15 @@ export const STORY_LOGS = [
   "ENTRY #08: The doors are jammed. The phone line is dead. Only the machine works.",
   "ENTRY #09: They aren't singing anymore. They are whispering my name.",
   "ENTRY #10: I cut the red wire and heard a laugh. Not a mechanical one.",
+];
+
+export const MOCK_BOT_NAMES = [
+  "Bonnie_Bot",
+  "Chica_Fan",
+  "Foxy_Runner",
+  "Purple_Guy",
+  "Phone_Guy",
+  "Endo_01",
+  "Crying_Child",
+  "Vanny"
 ];
