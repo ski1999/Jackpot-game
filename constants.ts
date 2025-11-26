@@ -1,45 +1,153 @@
-import { StageConfig, SlotSymbol } from './types';
+import { StageConfig, SlotSymbol, SpinSpeed } from './types';
+
+// --- Pixel Art Shapes (10x10) ---
+// 1 = Filled, 0 = Empty
+const PIXEL_SHAPES = {
+  PIZZA: [
+    "0000110000",
+    "0001111000",
+    "0011111100",
+    "0001111000",
+    "0000110000",
+    "0011111100",
+    "0110110110",
+    "0110110110",
+    "0011111100",
+    "0001111000"
+  ],
+  CUPCAKE: [
+    "0001111000",
+    "0011111100",
+    "0111011110",
+    "0111111110",
+    "0011111100",
+    "0011111100",
+    "0001111000",
+    "0001111000",
+    "0001111000",
+    "0011111100"
+  ],
+  MIC: [
+    "0001111000",
+    "0011111100",
+    "0011111100",
+    "0011111100",
+    "0001111000",
+    "0000110000",
+    "0000110000",
+    "0000110000",
+    "0011111100",
+    "0011111100"
+  ],
+  GUITAR: [
+    "0000011100",
+    "0000111110",
+    "0000011100",
+    "0000001000",
+    "0000001000",
+    "0000001000",
+    "0001111100",
+    "0011111110",
+    "0011111110",
+    "0001111100"
+  ],
+  HOOK: [
+    "0000000000",
+    "0000111000",
+    "0000111000",
+    "0000111000",
+    "0000111000",
+    "0000111000",
+    "0000111000",
+    "0011111000",
+    "0011000000",
+    "0011100000"
+  ],
+  BEAR: [
+    "1000000001",
+    "1100000011",
+    "1111111111",
+    "1101111011",
+    "1111111111",
+    "0110000110",
+    "0111111110",
+    "0110000110",
+    "0011111100",
+    "0001111000"
+  ],
+  // Reuse shapes for other themes with different colors for now to save space
+  // In a full game, each would have unique shapes
+  BATTERY: [
+    "0000110000",
+    "0011111100",
+    "0010011100",
+    "0010011100",
+    "0011111100",
+    "0011111100",
+    "0011111100",
+    "0011111100",
+    "0011111100",
+    "0011111100"
+  ],
+  SKULL: [
+    "0001111000",
+    "0011111100",
+    "0111111110",
+    "0110110110",
+    "0111111110",
+    "0011111100",
+    "0011111100",
+    "0001111000",
+    "0001111000",
+    "0001111000"
+  ]
+};
 
 // --- Symbol Sets ---
 
 export const SYMBOL_SETS: Record<string, SlotSymbol[]> = {
   PIZZERIA: [
-    { id: 'pizza', char: '🍕', color: 'text-orange-600', value: 10 },
-    { id: 'cupcake', char: '🧁', color: 'text-pink-600', value: 20 },
-    { id: 'mic', char: '🎤', color: 'text-slate-400', value: 30 },
-    { id: 'guitar', char: '🎸', color: 'text-red-700', value: 40 },
-    { id: 'hook', char: '🪝', color: 'text-slate-200', value: 50 },
-    { id: 'bear', char: '🐻', color: 'text-yellow-700', value: 100 },
+    { id: 'pizza', color: '#ea580c', value: 10, shape: PIXEL_SHAPES.PIZZA },
+    { id: 'cupcake', color: '#db2777', value: 20, shape: PIXEL_SHAPES.CUPCAKE },
+    { id: 'mic', color: '#94a3b8', value: 30, shape: PIXEL_SHAPES.MIC },
+    { id: 'guitar', color: '#b91c1c', value: 40, shape: PIXEL_SHAPES.GUITAR },
+    { id: 'hook', color: '#cbd5e1', value: 50, shape: PIXEL_SHAPES.HOOK },
+    { id: 'bear', color: '#a16207', value: 100, shape: PIXEL_SHAPES.BEAR },
   ],
   SECURITY: [
-    { id: 'battery', char: '🔋', color: 'text-green-600', value: 10 },
-    { id: 'tape', char: '📼', color: 'text-slate-500', value: 20 },
-    { id: 'flashlight', char: '🔦', color: 'text-yellow-200', value: 30 },
-    { id: 'camera', char: '📷', color: 'text-slate-300', value: 40 },
-    { id: 'badge', char: '📛', color: 'text-yellow-600', value: 50 },
-    { id: 'siren', char: '🚨', color: 'text-red-600', value: 100 },
+    { id: 'battery', color: '#16a34a', value: 10, shape: PIXEL_SHAPES.BATTERY },
+    { id: 'tape', color: '#64748b', value: 20, shape: PIXEL_SHAPES.MIC }, // Reusing mic shape as placeholder
+    { id: 'flashlight', color: '#fef08a', value: 30, shape: PIXEL_SHAPES.GUITAR },
+    { id: 'camera', color: '#cbd5e1', value: 40, shape: PIXEL_SHAPES.PIZZA },
+    { id: 'badge', color: '#ca8a04', value: 50, shape: PIXEL_SHAPES.HOOK },
+    { id: 'siren', color: '#dc2626', value: 100, shape: PIXEL_SHAPES.BEAR },
   ],
   NIGHTMARE: [
-    { id: 'teeth', char: '🦷', color: 'text-slate-200', value: 10 },
-    { id: 'eye', char: '👁️', color: 'text-red-400', value: 20 },
-    { id: 'drop', char: '🩸', color: 'text-red-700', value: 30 },
-    { id: 'skull', char: '💀', color: 'text-slate-300', value: 40 },
-    { id: 'ghost', char: '👻', color: 'text-purple-300', value: 50 },
-    { id: 'demon', char: '👿', color: 'text-purple-600', value: 100 },
+    { id: 'teeth', color: '#e2e8f0', value: 10, shape: PIXEL_SHAPES.HOOK },
+    { id: 'eye', color: '#f87171', value: 20, shape: PIXEL_SHAPES.CUPCAKE },
+    { id: 'drop', color: '#b91c1c', value: 30, shape: PIXEL_SHAPES.PIZZA },
+    { id: 'skull', color: '#cbd5e1', value: 40, shape: PIXEL_SHAPES.SKULL },
+    { id: 'ghost', color: '#d8b4fe', value: 50, shape: PIXEL_SHAPES.BATTERY },
+    { id: 'demon', color: '#9333ea', value: 100, shape: PIXEL_SHAPES.BEAR },
   ],
   ARCADE: [
-    { id: 'ticket', char: '🎟️', color: 'text-yellow-500', value: 10 },
-    { id: 'coin', char: '🪙', color: 'text-yellow-200', value: 20 },
-    { id: 'joystick', char: '🕹️', color: 'text-red-500', value: 30 },
-    { id: 'invader', char: '👾', color: 'text-green-500', value: 40 },
-    { id: 'balloon', char: '🎈', color: 'text-red-600', value: 50 },
-    { id: 'prize', char: '🎁', color: 'text-purple-500', value: 100 },
+    { id: 'ticket', color: '#eab308', value: 10, shape: PIXEL_SHAPES.BATTERY },
+    { id: 'coin', color: '#fef08a', value: 20, shape: PIXEL_SHAPES.PIZZA },
+    { id: 'joystick', color: '#ef4444', value: 30, shape: PIXEL_SHAPES.MIC },
+    { id: 'invader', color: '#22c55e', value: 40, shape: PIXEL_SHAPES.SKULL },
+    { id: 'balloon', color: '#dc2626', value: 50, shape: PIXEL_SHAPES.CUPCAKE },
+    { id: 'prize', color: '#a855f7', value: 100, shape: PIXEL_SHAPES.BEAR },
   ]
+};
+
+export const SPEED_CONFIG: Record<SpinSpeed, { totalDuration: number, reelDelay: number, spinInterval: number }> = {
+  SLOW: { totalDuration: 2500, reelDelay: 400, spinInterval: 150 },
+  NORMAL: { totalDuration: 1500, reelDelay: 250, spinInterval: 100 },
+  FAST: { totalDuration: 600, reelDelay: 100, spinInterval: 60 }
 };
 
 const THEMES = ['PIZZERIA', 'SECURITY', 'NIGHTMARE', 'ARCADE'];
 
-// Darker, dirtier color palettes
 const COLORS = [
   { p: 'bg-zinc-900', s: 'bg-black', a: 'border-yellow-900', g: 'from-black via-zinc-900 to-black' },
   { p: 'bg-slate-900', s: 'bg-black', a: 'border-slate-800', g: 'from-black via-slate-950 to-black' },
@@ -53,7 +161,6 @@ export const STAGES: StageConfig[] = Array.from({ length: 51 }, (_, i) => {
   const colorIndex = i % COLORS.length;
   const config = COLORS[colorIndex];
   
-  // Probability Curve: Starts at 15%, decreases slowly
   const baseProb = Math.max(0.01, 0.15 - (i * 0.002) + (Math.sin(i) * 0.02));
 
   let name = `NIGHT ${stageNum}`;
@@ -68,7 +175,7 @@ export const STAGES: StageConfig[] = Array.from({ length: 51 }, (_, i) => {
     accentColor: config.a,
     bgGradient: config.g,
     baseProb: parseFloat(baseProb.toFixed(3)),
-    wireCount: Math.min(8, 3 + Math.floor(i / 5)), // Increases cap at 8
+    wireCount: Math.min(8, 3 + Math.floor(i / 5)), 
     jackpotReward: 500 + (i * 250),
     symbolSetId: THEMES[themeIndex],
   };
@@ -81,6 +188,6 @@ export const WIRE_COLORS = [
   'bg-yellow-700',
   'bg-purple-800',
   'bg-orange-800',
-  'bg-gray-400', // White/Grey wire
+  'bg-gray-400',
   'bg-pink-800',
 ];

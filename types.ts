@@ -2,6 +2,13 @@ export type ViewState = 'front' | 'back';
 
 export type WireStatus = 'intact' | 'cut';
 
+export type SpinSpeed = 'SLOW' | 'NORMAL' | 'FAST';
+
+export interface GameSettings {
+  volume: number;
+  speed: SpinSpeed;
+}
+
 export interface Wire {
   id: number;
   color: string;
@@ -12,9 +19,10 @@ export interface Wire {
 
 export interface SlotSymbol {
   id: string;
-  char: string;
-  color: string;
+  char?: string; // Fallback
+  color: string; // Tailwind text color class for fallback, or fill color for pixel art
   value: number;
+  shape?: string[]; // 10x10 grid, 1 = fill, 0 = empty
 }
 
 export interface StageConfig {

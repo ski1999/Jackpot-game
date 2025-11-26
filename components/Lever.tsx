@@ -1,19 +1,33 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { soundEngine } from '../audio';
+import { SpinSpeed } from '../types';
 
 interface LeverProps {
   onPull: () => void;
   disabled: boolean;
+  speed: SpinSpeed;
 }
 
-export const Lever: React.FC<LeverProps> = ({ onPull, disabled }) => {
+const LEVER_PARAMS: Record<SpinSpeed, { resetDelay: number; stiffness: number; damping: number }> = {
+  FAST: { resetDelay: 250, stiffness: 500, damping: 25 },
+  NORMAL: { resetDelay: 700, stiffness: 150, damping: 15 },
+  SLOW: { resetDelay: 1200, stiffness: 50, damping: 20 },
+};
+
+export const Lever: React.FC<LeverProps> = ({ onPull, disabled, speed }) => {
   const [pulled, setPulled] = useState(false);
+  const params = LEVER_PARAMS[speed];
 
   const handleClick = () => {
-    if (disabled || pulled) return;
+    if (disabled || pulled) {
+      if (disabled) soundEngine.playClick(); // Error click
+      return;
+    }
+    soundEngine.playLeverPull();
     setPulled(true);
     onPull();
-    setTimeout(() => setPulled(false), 2000);
+    setTimeout(() => setPulled(false), params.resetDelay);
   };
 
   return (
@@ -50,8 +64,8 @@ export const Lever: React.FC<LeverProps> = ({ onPull, disabled }) => {
         animate={{ rotate: pulled ? 150 : 0 }}
         transition={{ 
             type: "spring", 
-            stiffness: 150, 
-            damping: 12,
+            stiffness: params.stiffness, 
+            damping: params.damping,
             restDelta: 0.001
         }}
         onClick={handleClick}

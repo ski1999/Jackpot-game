@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, AlertTriangle, Zap, Coins, Scissors, RotateCcw, Skull, Trophy, Battery, Activity } from 'lucide-react';
+import { Settings, AlertTriangle, Zap, Coins, Scissors, RotateCcw, Skull, Trophy, Battery, Activity, Wrench } from 'lucide-react';
 import { Reel } from './components/Reel';
 import { Lever } from './components/Lever';
-import { STAGES, SYMBOL_SETS, WIRE_COLORS } from './constants';
-import { StageConfig, Wire, SlotSymbol } from './types';
+import { SettingsPanel } from './components/SettingsPanel';
+import { STAGES, SYMBOL_SETS, WIRE_COLORS, SPEED_CONFIG } from './constants';
+import { StageConfig, Wire, SlotSymbol, GameSettings } from './types';
+import { soundEngine } from './audio';
 
 export default function App() {
   const [stageIndex, setStageIndex] = useState(0);
@@ -15,11 +17,33 @@ export default function App() {
   const currentStage = STAGES[stageIndex] || STAGES[0];
   const currentSymbols = useMemo(() => SYMBOL_SETS[currentStage.symbolSetId] || SYMBOL_SETS['PIZZERIA'], [currentStage]);
   
+  // Game Settings State
+  const [settings, setSettings] = useState<GameSettings>({ volume: 0.5, speed: 'NORMAL' });
+  const [showSettings, setShowSettings] = useState(false);
+
   const [jackpotProb, setJackpotProb] = useState(currentStage.baseProb);
   const [wires, setWires] = useState<Wire[]>([]);
   const [reelTargets, setReelTargets] = useState<[SlotSymbol, SlotSymbol, SlotSymbol] | null>(null);
   const [showWireModal, setShowWireModal] = useState<number | null>(null);
   const [message, setMessage] = useState<string>("");
+
+  // Update sound engine when settings change
+  useEffect(() => {
+    soundEngine.setVolume(settings.volume);
+  }, [settings.volume]);
+
+  // Start ambience on mount (user interaction required for actual play usually)
+  useEffect(() => {
+    const handleInteract = () => {
+        soundEngine.playAmbience();
+        window.removeEventListener('click', handleInteract);
+    };
+    window.addEventListener('click', handleInteract);
+    return () => {
+        soundEngine.stopAmbience();
+        window.removeEventListener('click', handleInteract);
+    };
+  }, []);
 
   const initStage = useCallback((stage: StageConfig) => {
     setJackpotProb(stage.baseProb);
@@ -49,8 +73,10 @@ export default function App() {
 
     setGameState('SPINNING');
     setMessage("INITIATING SEQUENCE...");
+    soundEngine.playSpin();
 
     const isJackpot = Math.random() < jackpotProb;
+    const speedConfig = SPEED_CONFIG[settings.speed];
 
     setTimeout(() => {
       if (isJackpot) {
@@ -61,6 +87,7 @@ export default function App() {
           setGameState('JACKPOT');
           setTotalPoints(p => p + currentStage.jackpotReward);
           setMessage("CRITICAL SUCCESS. ADVANCING.");
+          soundEngine.playJackpot();
           
           setTimeout(() => {
              if (stageIndex + 1 < STAGES.length) {
@@ -70,9 +97,10 @@ export default function App() {
              } else {
                setMessage("SHIFT COMPLETE. YOU SURVIVED.");
                setGameState('VICTORY');
+               soundEngine.playJackpot();
              }
           }, 3500);
-        }, 2000);
+        }, speedConfig.reelDelay * 3); // Wait for reels to settle visually
       } else {
         const jackpotId = currentSymbols[currentSymbols.length - 1].id;
         let t1, t2, t3;
@@ -88,21 +116,26 @@ export default function App() {
           setGameState('IDLE');
           setTotalPoints(p => p + 1);
           setMessage("FAILURE. POWER COMPENSATED +1.");
-        }, 2000);
+          soundEngine.playLose(); // Small lose sound
+        }, speedConfig.reelDelay * 3);
       }
-    }, 800);
+    }, speedConfig.totalDuration);
   };
 
   const handleCutWire = (wireId: number) => {
     const wire = wires.find(w => w.id === wireId);
     if (!wire || wire.status === 'cut') return;
+    
+    soundEngine.playClick();
 
     if (wire.isBomb) {
+      soundEngine.playJumpscare();
       setWires(prev => prev.map(w => w.id === wireId ? { ...w, status: 'cut' } : w));
       setGameState('GAME_OVER');
       setMessage("JUMPSCARE_LOADED.EXE");
       setView('front'); 
     } else {
+      soundEngine.playWarning(); // Or a success chime? Warning fits the "risk" theme
       setWires(prev => prev.map(w => w.id === wireId ? { ...w, status: 'cut' } : w));
       setJackpotProb(prev => Math.min(0.99, prev * wire.multiplier));
       setMessage(`BYPASS SUCCESS. ODDS: ${Math.floor(jackpotProb * wire.multiplier * 100)}%`);
@@ -113,11 +146,13 @@ export default function App() {
 
   const toggleView = () => {
     if (gameState === 'SPINNING' || gameState === 'GAME_OVER' || gameState === 'VICTORY') return;
+    soundEngine.playClick();
     setView(v => v === 'front' ? 'back' : 'front');
     setMessage(view === 'front' ? "MAINTENANCE MODE ACTIVE" : "SYSTEM READY");
   };
 
   const startNewGame = () => {
+    soundEngine.playClick();
     setStageIndex(0);
     setTotalPoints(0);
     setHasRevived(false);
@@ -127,6 +162,7 @@ export default function App() {
 
   const handleRevive = () => {
     if (hasRevived) return;
+    soundEngine.playClick();
     const newScore = Math.floor(totalPoints / 2);
     setTotalPoints(newScore);
     setHasRevived(true);
@@ -158,12 +194,19 @@ export default function App() {
                <span className="text-2xl retro-font text-yellow-500">{totalPoints.toLocaleString()}</span>
             </div>
          </div>
-         <div className="bg-black/80 p-2 border-2 border-green-900/50 flex flex-col items-end">
-            <div className="flex items-center gap-2 text-xs mb-1">
+         <div className="bg-black/80 p-2 border-2 border-green-900/50 flex flex-col items-end pointer-events-auto">
+            <button 
+                onClick={() => { soundEngine.playClick(); setShowSettings(true); }}
+                className="mb-2 p-2 hover:bg-green-900/30 text-green-500 border border-transparent hover:border-green-700 transition-colors"
+                title="Settings"
+            >
+                <Settings className="w-6 h-6 animate-spin-slow" />
+            </button>
+            <div className="flex items-center gap-2 text-xs mb-1 pointer-events-none">
               <Battery className={`w-4 h-4 ${hasRevived ? 'text-red-500' : 'text-green-500'}`} />
               <span>POWER: {hasRevived ? "CRITICAL" : "STABLE"}</span>
             </div>
-            <div className="text-[10px] text-zinc-500">
+            <div className="text-[10px] text-zinc-500 pointer-events-none">
                CAM-2B
             </div>
          </div>
@@ -184,7 +227,11 @@ export default function App() {
              {/* Dirt Overlay */}
              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-felt.png')] opacity-30 pointer-events-none" />
 
-             <Lever onPull={handleSpin} disabled={gameState !== 'IDLE'} />
+             <Lever 
+                onPull={handleSpin} 
+                disabled={gameState !== 'IDLE'} 
+                speed={settings.speed}
+             />
 
              {/* Machine Header */}
              <div className="w-full bg-black border-4 border-zinc-800 p-4 mb-4 text-center shadow-inner relative overflow-hidden">
@@ -219,12 +266,30 @@ export default function App() {
 
              {/* Reels */}
              <div className="flex justify-center gap-1 md:gap-2 bg-zinc-950 p-4 border-8 border-black shadow-[inset_0_0_20px_black] mb-6">
-               <Reel spinning={gameState === 'SPINNING'} targetSymbol={reelTargets ? reelTargets[0] : null} delay={0} symbols={currentSymbols} />
-               <Reel spinning={gameState === 'SPINNING'} targetSymbol={reelTargets ? reelTargets[1] : null} delay={100} symbols={currentSymbols} />
-               <Reel spinning={gameState === 'SPINNING'} targetSymbol={reelTargets ? reelTargets[2] : null} delay={200} symbols={currentSymbols} />
+               <Reel 
+                 spinning={gameState === 'SPINNING'} 
+                 targetSymbol={reelTargets ? reelTargets[0] : null} 
+                 delay={0} 
+                 symbols={currentSymbols} 
+                 speed={settings.speed}
+               />
+               <Reel 
+                 spinning={gameState === 'SPINNING'} 
+                 targetSymbol={reelTargets ? reelTargets[1] : null} 
+                 delay={SPEED_CONFIG[settings.speed].reelDelay} 
+                 symbols={currentSymbols} 
+                 speed={settings.speed}
+               />
+               <Reel 
+                 spinning={gameState === 'SPINNING'} 
+                 targetSymbol={reelTargets ? reelTargets[2] : null} 
+                 delay={SPEED_CONFIG[settings.speed].reelDelay * 2} 
+                 symbols={currentSymbols} 
+                 speed={settings.speed}
+               />
              </div>
 
-             {/* Controls */}
+             {/* Maintenance Button (Distinct from Settings) */}
              <div className="mt-auto w-full flex justify-between items-center px-2">
                 <div className="text-[10px] text-zinc-600 max-w-[120px] font-mono">
                    PULL LEVER TO START SHIFT
@@ -233,9 +298,11 @@ export default function App() {
                 <button 
                   onClick={toggleView}
                   disabled={gameState !== 'IDLE'}
-                  className="group relative p-3 bg-zinc-800 hover:bg-zinc-700 border-2 border-black text-white shadow-lg active:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="group relative p-3 bg-zinc-800 hover:bg-zinc-700 border-2 border-black text-white shadow-lg active:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  title="Maintenance Panel"
                 >
-                  <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500 text-zinc-400" />
+                  <span className="text-[10px] font-mono hidden md:inline">REAR ACCESS</span>
+                  <Wrench className="w-5 h-5 group-hover:-rotate-12 transition-transform duration-300 text-zinc-400" />
                 </button>
              </div>
           </div>
@@ -268,7 +335,12 @@ export default function App() {
                   {wires.map((wire) => (
                     <div key={wire.id} className="relative group">
                        <button
-                          onClick={() => wire.status === 'intact' && setShowWireModal(wire.id)}
+                          onClick={() => {
+                            if (wire.status === 'intact') {
+                              soundEngine.playClick();
+                              setShowWireModal(wire.id);
+                            }
+                          }}
                           disabled={wire.status === 'cut'}
                           className={`
                             relative w-full h-10 border-b-2 flex items-center justify-between px-4 transition-all
@@ -325,7 +397,7 @@ export default function App() {
                 </p>
                 <div className="flex gap-4 relative z-10">
                    <button 
-                     onClick={() => setShowWireModal(null)}
+                     onClick={() => { soundEngine.playClick(); setShowWireModal(null); }}
                      className="flex-1 py-3 bg-black text-zinc-400 text-sm border border-zinc-700 hover:bg-zinc-800 font-mono"
                    >
                      ABORT
@@ -339,6 +411,20 @@ export default function App() {
                 </div>
              </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- Settings Modal --- */}
+      <AnimatePresence>
+        {showSettings && (
+          <SettingsPanel 
+             settings={settings}
+             onUpdate={(newSettings) => {
+               soundEngine.playClick();
+               setSettings(newSettings);
+             }}
+             onClose={() => { soundEngine.playClick(); setShowSettings(false); }}
+          />
         )}
       </AnimatePresence>
 
