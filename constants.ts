@@ -76,7 +76,6 @@ const PIXEL_SHAPES = {
     "0011111100",
     "0001111000"
   ],
-  // Reuse shapes for other themes with different colors for now to save space
   BATTERY: [
     "0000110000",
     "0011111100",
@@ -111,6 +110,18 @@ const PIXEL_SHAPES = {
     "0111111111",
     "0011111111",
     "0001111110",
+    "0000000000"
+  ],
+  TICKET: [
+    "1111111111",
+    "1000000001",
+    "1011111101",
+    "1010000101",
+    "1010000101",
+    "1011111101",
+    "1000000001",
+    "1111111111",
+    "0000000000",
     "0000000000"
   ]
 };
@@ -156,6 +167,12 @@ export const SYMBOL_SETS: Record<string, SlotSymbol[]> = {
      { id: 'safe2', color: '#eab308', value: 1, shape: PIXEL_SHAPES.HOOK },
      { id: 'safe3', color: '#3b82f6', value: 1, shape: PIXEL_SHAPES.MIC },
      { id: 'bomb', color: '#dc2626', value: 0, shape: PIXEL_SHAPES.BOMB }, // The "Jackpot"
+  ],
+  PRIZE: [
+     { id: 'safe1', color: '#22c55e', value: 1, shape: PIXEL_SHAPES.BATTERY },
+     { id: 'safe2', color: '#eab308', value: 1, shape: PIXEL_SHAPES.HOOK },
+     { id: 'safe3', color: '#3b82f6', value: 1, shape: PIXEL_SHAPES.MIC },
+     { id: 'ticket', color: '#fbbf24', value: 100, shape: PIXEL_SHAPES.TICKET }, // The "Jackpot"
   ]
 };
 
