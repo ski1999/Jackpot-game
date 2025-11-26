@@ -7,19 +7,19 @@ import { Lobby } from './components/Lobby';
 import { MultiplayerGame } from './components/MultiplayerGame';
 import { SettingsPanel } from './components/SettingsPanel';
 import { soundEngine } from './audio';
-import { GameSettings, MultiplayerConfig, MultiplayerRoom, Player } from './types';
-import { MOCK_BOT_NAMES } from './constants';
+import { GameSettings } from './types';
+import { GameProvider, useGame } from './contexts/GameContext';
+import { CONFIG } from './config';
 
-export default function App() {
+// Main Router Component (Wrapped inside GameProvider)
+const GameRouter = () => {
   const [screen, setScreen] = useState<'LANDING' | 'SINGLE' | 'MULTI_MENU' | 'LOBBY' | 'MULTI_GAME'>('LANDING');
   const [nickname, setNickname] = useState('');
-  const [settings, setSettings] = useState<GameSettings>({ volume: 0.5, speed: 'NORMAL', storyMode: false });
+  const [settings, setSettings] = useState<GameSettings>({ volume: CONFIG.DEFAULT_VOLUME, speed: 'NORMAL', storyMode: false });
   const [showSettings, setShowSettings] = useState(false);
 
-  // Multiplayer State (Mock)
-  const [room, setRoom] = useState<MultiplayerRoom | null>(null);
-  const [playerId, setPlayerId] = useState<string>('');
-  const [mpError, setMpError] = useState<string>('');
+  // Get Multiplayer State from Context
+  const { room, service } = useGame();
 
   useEffect(() => {
     soundEngine.setVolume(settings.volume);
@@ -34,143 +34,27 @@ export default function App() {
     };
   }, [settings.volume]);
 
-  // --- Handlers ---
+  // Handle Room Updates to switch screens
+  useEffect(() => {
+      if (room) {
+          if (room.phase === 'LOBBY') {
+              setScreen('LOBBY');
+          } else {
+              setScreen('MULTI_GAME');
+          }
+      } else if (screen === 'LOBBY' || screen === 'MULTI_GAME') {
+          // If room was cleared (kick/disconnect), go back
+          setScreen('LANDING');
+      }
+  }, [room, screen]);
 
   const handleStartMultiplayer = () => {
-    setScreen('MULTI_MENU');
-  };
-
-  const handleCreateRoom = (config: MultiplayerConfig) => {
-    const newPlayerId = 'p-' + Date.now();
-    setPlayerId(newPlayerId);
-    
-    const hostPlayer: Player = {
-        id: newPlayerId,
-        nickname: nickname,
-        isHost: true,
-        status: 'WAITING',
-        avatarId: Math.floor(Math.random() * 10)
-    };
-
-    setRoom({
-        config,
-        players: [hostPlayer],
-        phase: 'LOBBY',
-        currentTurnIndex: 0,
-        losersFound: 0,
-        winnersFound: 0,
-        results: { losers: [], winners: [], survivors: [] }
-    });
-    setScreen('LOBBY');
-
-    // Simulate bots joining
-    simulateBotsJoining(config, hostPlayer.id);
-  };
-
-  const simulateBotsJoining = (config: MultiplayerConfig, hostId: string) => {
-    let botsAdded = 0;
-    const interval = setInterval(() => {
-        setRoom(prev => {
-            if (!prev || prev.players.length >= prev.config.maxPlayers) {
-                clearInterval(interval);
-                return prev;
-            }
-            const botName = MOCK_BOT_NAMES[Math.floor(Math.random() * MOCK_BOT_NAMES.length)] + '_' + Math.floor(Math.random()*99);
-            const bot: Player = {
-                id: `bot-${Date.now()}-${Math.random()}`,
-                nickname: botName.toUpperCase(),
-                isHost: false,
-                status: 'WAITING',
-                avatarId: Math.floor(Math.random() * 10)
-            };
-            return {
-                ...prev,
-                players: [...prev.players, bot]
-            };
-        });
-    }, 2000);
-  };
-
-  const handleJoinRoom = (code: string, pass: string) => {
-      // Mock join logic - usually would call API
-      if (room && room.config.roomCode === code) {
-           if (room.config.password && room.config.password !== pass) {
-               setMpError("INVALID PASSWORD");
-               soundEngine.playWarning();
-               return;
-           }
-           if (room.players.length >= room.config.maxPlayers) {
-               setMpError("LOBBY FULL");
-               soundEngine.playWarning();
-               return;
-           }
-
-           // Success Join (if room existed in local state - simplified for demo)
-           // In this demo, we can only join the room we just created if we backed out, 
-           // OR we simulate joining a fake room.
-           // Let's simulate joining a Fake Room for the sake of the demo if none exists.
-           const newPlayerId = 'p-' + Date.now();
-           setPlayerId(newPlayerId);
-           const me: Player = {
-               id: newPlayerId,
-               nickname: nickname,
-               isHost: false,
-               status: 'WAITING',
-               avatarId: Math.floor(Math.random() * 10)
-           };
-           
-           if (!room) {
-               // Create fake room to join
-               const fakeConfig = { roomCode: code, maxPlayers: 5, numLosers: 1, numWinners: 1 };
-               setRoom({
-                   config: fakeConfig,
-                   players: [
-                       { id: 'host-bot', nickname: 'HOST_BOT', isHost: true, status: 'WAITING', avatarId: 1 },
-                       me
-                   ],
-                   phase: 'LOBBY',
-                   currentTurnIndex: 0,
-                   losersFound: 0,
-                   winnersFound: 0,
-                   results: { losers: [], winners: [], survivors: [] }
-               });
-               simulateBotsJoining(fakeConfig, 'host-bot');
-           } else {
-               setRoom(prev => prev ? ({ ...prev, players: [...prev.players, me] }) : null);
-           }
-           setScreen('LOBBY');
-      } else {
-          // If no room exists in state, assume code is wrong for this local demo
-          // Or generate a fake one to let them play. Let's generate a fake one.
-           const newPlayerId = 'p-' + Date.now();
-           setPlayerId(newPlayerId);
-           const me: Player = { id: newPlayerId, nickname, isHost: false, status: 'WAITING', avatarId: 3 };
-           const fakeConfig = { roomCode: code, maxPlayers: 5, numLosers: 1, numWinners: 1 };
-           setRoom({
-               config: fakeConfig,
-               players: [{ id: 'host', nickname: 'ADMIN', isHost: true, status: 'WAITING', avatarId: 1 }, me],
-               phase: 'LOBBY',
-               currentTurnIndex: 0,
-               losersFound: 0,
-               winnersFound: 0,
-               results: { losers: [], winners: [], survivors: [] }
-           });
-           simulateBotsJoining(fakeConfig, 'host');
-           setScreen('LOBBY');
-      }
-  };
-
-  const handleStartGame = () => {
-      if (!room) return;
-      setRoom(prev => {
-          if(!prev) return null;
-          return {
-              ...prev,
-              phase: 'GAME_LOSER_ROUND',
-              players: prev.players.map(p => ({...p, status: 'PLAYING'}))
-          };
-      });
-      setScreen('MULTI_GAME');
+    if (nickname) {
+        service.connect(nickname);
+        setScreen('MULTI_MENU');
+    } else {
+        soundEngine.playWarning();
+    }
   };
 
   return (
@@ -192,31 +76,17 @@ export default function App() {
       {screen === 'MULTI_MENU' && (
           <MultiplayerMenus 
             onBack={() => setScreen('LANDING')}
-            onCreateRoom={handleCreateRoom}
-            onJoinRoom={handleJoinRoom}
-            error={mpError}
           />
       )}
 
-      {screen === 'LOBBY' && room && (
-          <Lobby 
-            room={room}
-            currentPlayerId={playerId}
-            onStartGame={handleStartGame}
-            onLeave={() => { setRoom(null); setScreen('LANDING'); }}
-          />
+      {screen === 'LOBBY' && (
+          <Lobby />
       )}
 
-      {screen === 'MULTI_GAME' && room && (
-          <MultiplayerGame 
-            room={room}
-            currentPlayerId={playerId}
-            updateRoom={setRoom}
-            onExit={() => { setRoom(null); setScreen('LANDING'); }}
-          />
+      {screen === 'MULTI_GAME' && (
+          <MultiplayerGame />
       )}
 
-      {/* Global Settings Modal */}
       {showSettings && (
         <SettingsPanel 
             settings={settings}
@@ -226,4 +96,12 @@ export default function App() {
       )}
     </>
   );
+};
+
+export default function App() {
+    return (
+        <GameProvider>
+            <GameRouter />
+        </GameProvider>
+    );
 }

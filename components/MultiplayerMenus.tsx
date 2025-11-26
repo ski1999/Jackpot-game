@@ -3,35 +3,31 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Users, AlertTriangle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { soundEngine } from '../audio';
-import { MultiplayerConfig } from '../types';
+import { useGame } from '../contexts/GameContext';
 
 interface MultiplayerMenusProps {
   onBack: () => void;
-  onCreateRoom: (config: MultiplayerConfig) => void;
-  onJoinRoom: (code: string, pass: string) => void;
-  error?: string;
 }
 
-export const MultiplayerMenus: React.FC<MultiplayerMenusProps> = ({ onBack, onCreateRoom, onJoinRoom, error }) => {
+export const MultiplayerMenus: React.FC<MultiplayerMenusProps> = ({ onBack }) => {
+  const { service, error } = useGame();
   const [view, setView] = useState<'MENU' | 'CREATE' | 'JOIN'>('MENU');
   
-  // Create Room State
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [numLosers, setNumLosers] = useState(1);
   const [numWinners, setNumWinners] = useState(1);
   const [password, setPassword] = useState('');
 
-  // Join Room State
   const [joinCode, setJoinCode] = useState('');
   const [joinPass, setJoinPass] = useState('');
 
   const handleCreate = () => {
     if (numLosers + numWinners >= maxPlayers) {
         soundEngine.playWarning();
-        return; // Validation handled by UI disabling usually, but redundant check
+        return;
     }
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    onCreateRoom({
+    service.createRoom({
         roomCode: code,
         password: password || undefined,
         maxPlayers,
@@ -39,6 +35,10 @@ export const MultiplayerMenus: React.FC<MultiplayerMenusProps> = ({ onBack, onCr
         numWinners
     });
   };
+
+  const handleJoin = () => {
+      service.joinRoom(joinCode, joinPass);
+  }
 
   const isValidConfig = (numLosers + numWinners) < maxPlayers;
 
@@ -151,7 +151,7 @@ export const MultiplayerMenus: React.FC<MultiplayerMenusProps> = ({ onBack, onCr
 
                  <button 
                     disabled={joinCode.length < 6}
-                    onClick={() => { soundEngine.playClick(); onJoinRoom(joinCode, joinPass); }}
+                    onClick={() => { soundEngine.playClick(); handleJoin(); }}
                     className="w-full py-4 bg-green-900/20 border border-green-700 text-green-500 hover:bg-green-900/40 disabled:opacity-50 disabled:cursor-not-allowed font-bold mt-8"
                  >
                     CONNECT TO SYSTEM

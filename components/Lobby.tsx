@@ -1,19 +1,16 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Users, Clock, AlertTriangle, Play } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { soundEngine } from '../audio';
-import { MultiplayerRoom, Player } from '../types';
+import { useGame } from '../contexts/GameContext';
 
-interface LobbyProps {
-  room: MultiplayerRoom;
-  currentPlayerId: string;
-  onStartGame: () => void;
-  onLeave: () => void;
-}
+export const Lobby: React.FC = () => {
+  const { room, playerId, service } = useGame();
+  
+  if (!room) return null;
 
-export const Lobby: React.FC<LobbyProps> = ({ room, currentPlayerId, onStartGame, onLeave }) => {
-  const isHost = room.players.find(p => p.id === currentPlayerId)?.isHost;
+  const isHost = room.players.find(p => p.id === playerId)?.isHost;
   const missingPlayers = room.config.maxPlayers - room.players.length;
 
   return (
@@ -39,13 +36,12 @@ export const Lobby: React.FC<LobbyProps> = ({ room, currentPlayerId, onStartGame
                     key={player.id}
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className={`bg-zinc-900 border-2 p-4 flex flex-col items-center justify-center h-32 relative overflow-hidden ${player.id === currentPlayerId ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-zinc-700'}`}
+                    className={`bg-zinc-900 border-2 p-4 flex flex-col items-center justify-center h-32 relative overflow-hidden ${player.id === playerId ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-zinc-700'}`}
                 >
                     {player.isHost && (
                         <div className="absolute top-1 right-1 text-[8px] bg-yellow-900 text-yellow-500 px-1">HOST</div>
                     )}
                     <div className="w-12 h-12 bg-black rounded-full border border-zinc-700 mb-2 flex items-center justify-center text-2xl">
-                        {/* Simple avatar based on ID */}
                         {['🐻', '🐰', '🐔', '🦊', '🐊', '🐺'][player.avatarId % 6]}
                     </div>
                     <div className="text-sm font-bold uppercase truncate w-full text-center">{player.nickname}</div>
@@ -76,7 +72,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, currentPlayerId, onStartGame
                     </div>
                 ) : (
                     <button 
-                        onClick={() => { soundEngine.playClick(); onStartGame(); }}
+                        onClick={() => { soundEngine.playClick(); service.startGame(); }}
                         className="w-full py-4 bg-green-900/20 border-2 border-green-500 text-green-500 hover:bg-green-900/40 font-bold text-lg animate-pulse"
                     >
                         START SEQUENCE
@@ -89,7 +85,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, currentPlayerId, onStartGame
             )}
             
             <button 
-                onClick={() => { soundEngine.playClick(); onLeave(); }}
+                onClick={() => { soundEngine.playClick(); service.leaveRoom(); }}
                 className="w-full py-3 bg-zinc-900 border border-red-900 text-red-700 hover:bg-red-900/20 text-sm"
             >
                 DISCONNECT
