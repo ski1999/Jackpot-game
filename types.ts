@@ -27,5 +27,5 @@ export interface StageConfig {
   wireCount: number;
   jackpotReward: number;
   bgGradient: string;
-  symbolSet: SlotSymbol[];
+  symbolSetId: string;
 }

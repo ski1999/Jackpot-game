@@ -13,26 +13,40 @@ export const Lever: React.FC<LeverProps> = ({ onPull, disabled }) => {
     if (disabled || pulled) return;
     setPulled(true);
     onPull();
-    setTimeout(() => setPulled(false), 2000); // Reset after animation cycle
+    setTimeout(() => setPulled(false), 2000);
   };
 
   return (
     <div className="absolute top-[280px] -right-[80px] w-24 h-64 z-20 flex items-center pointer-events-auto select-none">
       
-      {/* Base Connector - Blocky */}
-      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-24 bg-slate-800 border-4 border-black shadow-xl" />
+      {/* Base - Rusted Metal */}
+      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-32 bg-zinc-800 border-r-4 border-black shadow-xl" 
+           style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.3) 5px, rgba(0,0,0,0.3) 10px)' }}>
+           <div className="w-full h-full bg-orange-900/20 mix-blend-overlay"></div>
+      </div>
 
-      {/* Pivot Point - Blocky */}
+      {/* Pivot Point */}
       <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10">
-        <div className="w-16 h-16 bg-slate-700 border-4 border-black flex items-center justify-center">
-            <div className="w-6 h-6 bg-slate-900 border-2 border-slate-600" />
+        <div className="w-20 h-20 bg-zinc-900 border-4 border-black rounded-full flex items-center justify-center shadow-lg relative">
+            <div className="absolute inset-0 rounded-full border-2 border-zinc-700 opacity-50"></div>
+            {/* Bolts */}
+            <div className="absolute top-2 w-2 h-2 bg-zinc-600 rounded-full shadow-inner"></div>
+            <div className="absolute bottom-2 w-2 h-2 bg-zinc-600 rounded-full shadow-inner"></div>
+            <div className="absolute left-2 w-2 h-2 bg-zinc-600 rounded-full shadow-inner"></div>
+            <div className="absolute right-2 w-2 h-2 bg-zinc-600 rounded-full shadow-inner"></div>
+            
+            <div className="w-8 h-8 bg-black rounded-full border-2 border-zinc-700" />
         </div>
       </div>
 
-      {/* Handle Arm */}
+      {/* Handle Arm - Hazard Strips */}
       <motion.div
-        className="absolute left-10 top-1/2 w-4 h-40 bg-gradient-to-r from-slate-400 to-slate-600 border-x-2 border-black origin-bottom cursor-pointer"
-        style={{ x: '-50%', y: '-100%' }} // Position bottom of stick at pivot center
+        className="absolute left-10 top-1/2 w-6 h-40 bg-yellow-600 border-x-2 border-black origin-bottom cursor-pointer"
+        style={{ 
+            x: '-50%', 
+            y: '-100%',
+            backgroundImage: 'repeating-linear-gradient(45deg, #000, #000 10px, #eab308 10px, #eab308 20px)'
+        }}
         animate={{ rotate: pulled ? 150 : 0 }}
         transition={{ 
             type: "spring", 
@@ -42,9 +56,9 @@ export const Lever: React.FC<LeverProps> = ({ onPull, disabled }) => {
         }}
         onClick={handleClick}
       >
-          {/* Knob - Blocky */}
-          <div className={`absolute -top-12 left-1/2 -translate-x-1/2 w-14 h-14 bg-red-600 border-4 border-black transition-all ${disabled ? 'grayscale opacity-50 cursor-not-allowed' : 'hover:brightness-110 active:scale-95'}`}>
-              <div className="absolute top-2 right-2 w-4 h-4 bg-white opacity-40" />
+          {/* Knob - Red Ball */}
+          <div className={`absolute -top-12 left-1/2 -translate-x-1/2 w-14 h-14 bg-red-800 rounded-full border-4 border-black transition-all shadow-[inset_-5px_-5px_10px_rgba(0,0,0,0.5)] ${disabled ? 'grayscale opacity-50 cursor-not-allowed' : 'hover:brightness-110 active:scale-95'}`}>
+              <div className="absolute top-3 right-3 w-4 h-4 bg-red-400 rounded-full opacity-30 blur-sm" />
           </div>
       </motion.div>
     </div>

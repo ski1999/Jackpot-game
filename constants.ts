@@ -3,48 +3,48 @@ import { StageConfig, SlotSymbol } from './types';
 // --- Symbol Sets ---
 
 export const SYMBOL_SETS: Record<string, SlotSymbol[]> = {
-  CLASSIC: [
-    { id: 'cherry', char: '🍒', color: 'text-red-500', value: 10 },
-    { id: 'lemon', char: '🍋', color: 'text-yellow-400', value: 20 },
-    { id: 'grape', char: '🍇', color: 'text-purple-500', value: 30 },
-    { id: 'bell', char: '🔔', color: 'text-yellow-600', value: 40 },
-    { id: 'diamond', char: '💎', color: 'text-cyan-400', value: 50 },
-    { id: 'seven', char: '7️⃣', color: 'text-red-600', value: 100 },
+  PIZZERIA: [
+    { id: 'pizza', char: '🍕', color: 'text-orange-600', value: 10 },
+    { id: 'cupcake', char: '🧁', color: 'text-pink-600', value: 20 },
+    { id: 'mic', char: '🎤', color: 'text-slate-400', value: 30 },
+    { id: 'guitar', char: '🎸', color: 'text-red-700', value: 40 },
+    { id: 'hook', char: '🪝', color: 'text-slate-200', value: 50 },
+    { id: 'bear', char: '🐻', color: 'text-yellow-700', value: 100 },
   ],
-  RPG: [
-    { id: 'potion', char: '🧪', color: 'text-green-400', value: 10 },
-    { id: 'shield', char: '🛡️', color: 'text-slate-400', value: 20 },
-    { id: 'dagger', char: '🗡️', color: 'text-slate-200', value: 30 },
-    { id: 'scroll', char: '📜', color: 'text-yellow-200', value: 40 },
-    { id: 'chest', char: '🧰', color: 'text-yellow-600', value: 50 },
-    { id: 'crown', char: '👑', color: 'text-yellow-400', value: 100 },
+  SECURITY: [
+    { id: 'battery', char: '🔋', color: 'text-green-600', value: 10 },
+    { id: 'tape', char: '📼', color: 'text-slate-500', value: 20 },
+    { id: 'flashlight', char: '🔦', color: 'text-yellow-200', value: 30 },
+    { id: 'camera', char: '📷', color: 'text-slate-300', value: 40 },
+    { id: 'badge', char: '📛', color: 'text-yellow-600', value: 50 },
+    { id: 'siren', char: '🚨', color: 'text-red-600', value: 100 },
   ],
-  SPACE: [
-    { id: 'meteor', char: '☄️', color: 'text-orange-400', value: 10 },
-    { id: 'satellite', char: '🛰️', color: 'text-slate-300', value: 20 },
-    { id: 'rocket', char: '🚀', color: 'text-red-400', value: 30 },
-    { id: 'alien', char: '👾', color: 'text-green-500', value: 40 },
-    { id: 'planet', char: '🪐', color: 'text-purple-400', value: 50 },
-    { id: 'ufo', char: '🛸', color: 'text-cyan-400', value: 100 },
+  NIGHTMARE: [
+    { id: 'teeth', char: '🦷', color: 'text-slate-200', value: 10 },
+    { id: 'eye', char: '👁️', color: 'text-red-400', value: 20 },
+    { id: 'drop', char: '🩸', color: 'text-red-700', value: 30 },
+    { id: 'skull', char: '💀', color: 'text-slate-300', value: 40 },
+    { id: 'ghost', char: '👻', color: 'text-purple-300', value: 50 },
+    { id: 'demon', char: '👿', color: 'text-purple-600', value: 100 },
   ],
-  NATURE: [
-    { id: 'leaf', char: '🍃', color: 'text-green-500', value: 10 },
-    { id: 'mushroom', char: '🍄', color: 'text-red-400', value: 20 },
-    { id: 'cactus', char: '🌵', color: 'text-green-700', value: 30 },
-    { id: 'flower', char: '🌻', color: 'text-yellow-500', value: 40 },
-    { id: 'tree', char: '🌲', color: 'text-green-800', value: 50 },
-    { id: 'sun', char: '☀️', color: 'text-yellow-300', value: 100 },
+  ARCADE: [
+    { id: 'ticket', char: '🎟️', color: 'text-yellow-500', value: 10 },
+    { id: 'coin', char: '🪙', color: 'text-yellow-200', value: 20 },
+    { id: 'joystick', char: '🕹️', color: 'text-red-500', value: 30 },
+    { id: 'invader', char: '👾', color: 'text-green-500', value: 40 },
+    { id: 'balloon', char: '🎈', color: 'text-red-600', value: 50 },
+    { id: 'prize', char: '🎁', color: 'text-purple-500', value: 100 },
   ]
 };
 
-const THEMES = ['CLASSIC', 'RPG', 'SPACE', 'NATURE'];
+const THEMES = ['PIZZERIA', 'SECURITY', 'NIGHTMARE', 'ARCADE'];
+
+// Darker, dirtier color palettes
 const COLORS = [
-  { p: 'bg-red-700', s: 'bg-red-900', a: 'border-yellow-500', g: 'from-red-950 via-slate-900 to-black' },
-  { p: 'bg-blue-700', s: 'bg-indigo-900', a: 'border-cyan-400', g: 'from-blue-950 via-slate-900 to-black' },
-  { p: 'bg-emerald-700', s: 'bg-emerald-900', a: 'border-lime-400', g: 'from-emerald-950 via-slate-900 to-black' },
-  { p: 'bg-purple-700', s: 'bg-purple-900', a: 'border-pink-400', g: 'from-purple-950 via-slate-900 to-black' },
-  { p: 'bg-slate-700', s: 'bg-slate-800', a: 'border-white', g: 'from-gray-900 via-slate-950 to-black' },
-  { p: 'bg-orange-700', s: 'bg-orange-900', a: 'border-yellow-300', g: 'from-orange-950 via-slate-900 to-black' },
+  { p: 'bg-zinc-900', s: 'bg-black', a: 'border-yellow-900', g: 'from-black via-zinc-900 to-black' },
+  { p: 'bg-slate-900', s: 'bg-black', a: 'border-slate-800', g: 'from-black via-slate-950 to-black' },
+  { p: 'bg-red-950', s: 'bg-black', a: 'border-red-900', g: 'from-black via-red-950 to-black' },
+  { p: 'bg-indigo-950', s: 'bg-black', a: 'border-indigo-900', g: 'from-black via-indigo-950 to-black' },
 ];
 
 export const STAGES: StageConfig[] = Array.from({ length: 51 }, (_, i) => {
@@ -53,13 +53,16 @@ export const STAGES: StageConfig[] = Array.from({ length: 51 }, (_, i) => {
   const colorIndex = i % COLORS.length;
   const config = COLORS[colorIndex];
   
-  // Probability Curve: Starts at 15%, decreases slowly, but never below 1%
-  // Oscillates slightly to give "lucky" stages
+  // Probability Curve: Starts at 15%, decreases slowly
   const baseProb = Math.max(0.01, 0.15 - (i * 0.002) + (Math.sin(i) * 0.02));
+
+  let name = `NIGHT ${stageNum}`;
+  if (stageNum % 5 === 0) name = `NIGHT ${stageNum} [HARD]`;
+  if (stageNum > 50) name = "CUSTOM NIGHT";
 
   return {
     id: stageNum,
-    name: `LEVEL ${stageNum < 10 ? '0' + stageNum : stageNum}`,
+    name: name,
     primaryColor: config.p,
     secondaryColor: config.s,
     accentColor: config.a,
@@ -72,12 +75,12 @@ export const STAGES: StageConfig[] = Array.from({ length: 51 }, (_, i) => {
 });
 
 export const WIRE_COLORS = [
-  'bg-red-500',
-  'bg-blue-500',
-  'bg-green-500',
-  'bg-yellow-500',
-  'bg-purple-500',
-  'bg-orange-500',
-  'bg-pink-500',
-  'bg-cyan-500',
+  'bg-red-800',
+  'bg-blue-800',
+  'bg-green-800',
+  'bg-yellow-700',
+  'bg-purple-800',
+  'bg-orange-800',
+  'bg-gray-400', // White/Grey wire
+  'bg-pink-800',
 ];
