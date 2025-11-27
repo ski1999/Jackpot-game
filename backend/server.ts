@@ -6,6 +6,7 @@ import { Player, MultiplayerConfig } from './types';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { StatsDatabase } from './stats';
 
 // Fix for __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -13,6 +14,7 @@ const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 8080;
 const USE_REDIS = process.env.USE_REDIS === 'true';
+const USE_POSTGRES = process.env.USE_POSTGRES === 'true';
 
 // 1. Create HTTP Server (Serves Frontend + Upgrades WS)
 const server = createServer((req, res) => {
@@ -62,8 +64,9 @@ const server = createServer((req, res) => {
 
 const wss = new WebSocketServer({ server });
 const db = USE_REDIS ? new RedisDatabase() : new MemoryDatabase();
+const statsDb = USE_POSTGRES ? new StatsDatabase() : null;
 
-console.log(`Faz-Slots Backend running on port ${PORT} (Redis: ${USE_REDIS})`);
+console.log(`Faz-Slots Backend running on port ${PORT} (Redis: ${USE_REDIS}, Postgres: ${USE_POSTGRES})`);
 
 // Helper to broadcast room state to all players in that room
 const broadcastRoomUpdate = async (roomCode: string) => {
@@ -184,6 +187,11 @@ wss.on('connection', (ws: WebSocket) => {
                  if (r) {
                      GameLogic.processTurnResult(r, result.hit);
                      r.turnResult = undefined;
+                     
+                     if (r.phase === 'RESULTS' && statsDb && !r.statsRecorded) {
+                        statsDb.recordGameStats(r);
+                     }
+
                      await db.updateRoom(r.config.roomCode, r);
                      broadcastRoomUpdate(r.config.roomCode);
                  }
@@ -211,6 +219,11 @@ wss.on('connection', (ws: WebSocket) => {
                          if (r) {
                              GameLogic.processTurnResult(r, true);
                              r.turnResult = undefined;
+
+                             if (r.phase === 'RESULTS' && statsDb && !r.statsRecorded) {
+                                statsDb.recordGameStats(r);
+                             }
+
                              await db.updateRoom(r.config.roomCode, r);
                              broadcastRoomUpdate(r.config.roomCode);
                          }

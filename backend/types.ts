@@ -44,4 +44,5 @@ export interface MultiplayerRoom {
   currentProb?: number;
   currentWires?: Wire[];
   turnResult?: { hit: boolean };
+  statsRecorded?: boolean;
 }

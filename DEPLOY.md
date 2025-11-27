@@ -76,6 +76,21 @@ Once these files are created, you can deploy using:
 # Build the image
 docker build -t fazbear-slots .
 
-# Run the container
+# Run the container (Local Test)
 docker run -p 8080:8080 fazbear-slots
 ```
+
+### Database Configuration (Production)
+
+To enable persistence, set the following environment variables when running the container:
+
+```bash
+docker run -p 8080:8080 \
+  -e USE_REDIS=true \
+  -e REDIS_URL=redis://your-redis-host:6379 \
+  -e USE_POSTGRES=true \
+  -e DATABASE_URL=postgres://user:pass@host:5432/dbname \
+  fazbear-slots
+```
+
+Ensure you run the contents of `backend/schema.sql` on your PostgreSQL database to create the required tables.
