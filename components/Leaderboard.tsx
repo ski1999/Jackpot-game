@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, X, Medal } from 'lucide-react';
@@ -57,9 +58,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ onClose }) => {
         <div className="flex-1 overflow-y-auto border-2 border-zinc-800 bg-black p-2">
             <div className="grid grid-cols-12 gap-2 text-[10px] md:text-xs text-zinc-500 uppercase border-b border-zinc-800 pb-2 mb-2 font-bold text-center">
                 <div className="col-span-2">Rank</div>
-                <div className="col-span-4 text-left pl-2">Employee</div>
+                <div className="col-span-4 text-left pl-2">Gambler</div>
                 <div className="col-span-3">High Score</div>
-                <div className="col-span-3">Stages</div>
+                <div className="col-span-3">Floors</div>
             </div>
             
             {loading ? (

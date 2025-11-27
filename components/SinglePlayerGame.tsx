@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, AlertTriangle, Zap, Coins, Scissors, RotateCcw, Skull, Trophy, Battery, Activity, Wrench, ArrowLeft, Save, Trash2, Play } from 'lucide-react';
 import { Reel } from './Reel';
 import { Lever } from './Lever';
 import { SettingsPanel } from './SettingsPanel';
-import { STAGES, SYMBOL_SETS, WIRE_COLORS, SPEED_CONFIG, STORY_LOGS } from '../constants';
+import { STAGES, SYMBOL_SETS, WIRE_COLORS, SPEED_CONFIG, STORY_LOGS, GAME_RESULT_THEMES } from '../constants';
 import { StageConfig, Wire, SlotSymbol, GameSettings, SinglePlayerSaveState } from '../types';
 import { soundEngine } from '../audio';
 import { useGame } from '../contexts/GameContext';
@@ -34,6 +35,9 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
   const [showWireModal, setShowWireModal] = useState<number | null>(null);
   const [message, setMessage] = useState<string>("");
   const [showResumeModal, setShowResumeModal] = useState(false);
+  
+  // New State for Result Theme
+  const [resultTheme, setResultTheme] = useState(GAME_RESULT_THEMES[0]);
 
   // Telemetry ref
   const lastReadyTime = useRef<number>(Date.now());
@@ -43,7 +47,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
   const [showSettings, setShowSettings] = useState(false);
 
   const currentStage = STAGES[stageIndex] || STAGES[0];
-  const currentSymbols = useMemo(() => SYMBOL_SETS[currentStage.symbolSetId] || SYMBOL_SETS['PIZZERIA'], [currentStage]);
+  const currentSymbols = useMemo(() => SYMBOL_SETS[currentStage.symbolSetId] || SYMBOL_SETS['CLASSIC'], [currentStage]);
 
   // Initial Load Check
   useEffect(() => {
@@ -123,7 +127,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
           setHasRevived(parsed.hasRevived);
           setJackpotProb(parsed.jackpotProb);
           
-          setMessage(`RESUMING NIGHT ${parsed.stageIndex + 1}`);
+          setMessage(`RESUMING SESSION ${parsed.stageIndex + 1}`);
           setShowResumeModal(false);
           setGameState('IDLE');
       } else {
@@ -132,6 +136,10 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
   };
 
   const handleGameOver = useCallback((points: number) => {
+      // Pick a random theme for the result screen
+      const randomTheme = GAME_RESULT_THEMES[Math.floor(Math.random() * GAME_RESULT_THEMES.length)];
+      setResultTheme(randomTheme);
+
       // Clear save on game over
       localStorage.removeItem(STORAGE_KEY);
       // Submit Score with Stage Index (Stages Cleared)
@@ -149,7 +157,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
        setShowStory(false);
        setShowCoinsBurst(false);
     } else {
-       setMessage("SHIFT COMPLETE. YOU SURVIVED.");
+       setMessage("QUOTA MET. YOU SURVIVED.");
        setGameState('VICTORY');
        soundEngine.playJackpot();
        handleGameOver(totalPoints);
@@ -238,7 +246,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
       setWires(prev => prev.map(w => w.id === wireId ? { ...w, status: 'cut' } : w));
       setGameState('GAME_OVER');
       handleGameOver(totalPoints);
-      setMessage("JUMPSCARE_LOADED.EXE");
+      setMessage("SHORT_CIRCUIT_DETECTED");
       setView('front'); 
     } else {
       soundEngine.playWarning(); 
@@ -318,11 +326,11 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
                 <div className="relative z-10">
                     <Save className="w-12 h-12 text-green-500 mx-auto mb-4" />
                     <h2 className="text-xl retro-font text-green-500 mb-2">SAVE DATA FOUND</h2>
-                    <p className="text-zinc-400 text-xs font-mono mb-6">UNFINISHED SHIFT DETECTED IN MEMORY BANK.</p>
+                    <p className="text-zinc-400 text-xs font-mono mb-6">UNFINISHED SESSION DETECTED IN MEMORY BANK.</p>
                     
                     <div className="flex flex-col gap-3">
                         <button onClick={handleResume} className="w-full py-3 bg-green-900/30 border border-green-600 text-green-400 hover:bg-green-900/50 hover:text-white flex items-center justify-center gap-2 transition-all">
-                           <Play className="w-4 h-4" /> RESUME SHIFT
+                           <Play className="w-4 h-4" /> RESUME SESSION
                         </button>
                         <button onClick={startNewGame} className="w-full py-3 bg-zinc-900 border border-zinc-700 text-zinc-500 hover:border-red-500 hover:text-red-500 flex items-center justify-center gap-2 transition-all">
                            <Trash2 className="w-4 h-4" /> DISCARD & START NEW
@@ -377,7 +385,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
              <Lever onPull={handleSpin} disabled={gameState !== 'IDLE' || showResumeModal} speed={settings.speed} />
 
              <div className="w-full bg-black border-4 border-zinc-800 p-2 md:p-4 mb-2 text-center shadow-inner relative overflow-hidden">
-               <h2 className="text-xl md:text-3xl retro-font text-red-600 animate-pulse drop-shadow-[0_0_5px_red]">FAZ-SLOTS</h2>
+               <h2 className="text-xl md:text-3xl retro-font text-red-600 animate-pulse drop-shadow-[0_0_5px_red]">VOLTAGE VICES</h2>
              </div>
 
              <div className="w-full bg-black border-4 border-zinc-700 p-1 md:p-2 mb-2 grid grid-cols-2 gap-2 relative overflow-hidden font-mono">
@@ -407,7 +415,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
              </div>
 
              <div className="w-full flex justify-between items-center px-2 mb-2">
-                <div className="text-[8px] md:text-[10px] text-zinc-600 max-w-[120px] font-mono">PULL LEVER TO START SHIFT</div>
+                <div className="text-[8px] md:text-[10px] text-zinc-600 max-w-[120px] font-mono">PULL LEVER TO TEST YOUR LUCK</div>
                 <button 
                   onClick={toggleView}
                   disabled={gameState !== 'IDLE' || showResumeModal}
@@ -502,19 +510,23 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
                {gameState === 'GAME_OVER' ? <Skull className="w-16 h-16 md:w-24 md:h-24 text-red-700 mb-4 animate-bounce drop-shadow-[0_0_15px_red]" /> : <Trophy className="w-16 h-16 md:w-24 md:h-24 text-yellow-500 mb-4 animate-bounce drop-shadow-[0_0_15px_yellow]" />}
                <h2 className={`text-4xl md:text-7xl mb-4 retro-font ${gameState === 'GAME_OVER' ? 'text-red-600' : 'text-yellow-500'} text-glow`}>{gameState === 'GAME_OVER' ? 'GAME OVER' : '6:00 AM'}</h2>
                <div className="mb-8 p-4 md:p-6 bg-black border-2 border-zinc-800 w-full relative">
-                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-zinc-900 px-2 text-zinc-500 text-[10px] md:text-xs font-mono">FINAL PAYCHECK</div>
+                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-zinc-900 px-2 text-zinc-500 text-[10px] md:text-xs font-mono uppercase">
+                    {resultTheme.label} {/* DYNAMIC LABEL */}
+                 </div>
                  <div className="text-2xl md:text-5xl text-white tracking-widest mt-2 retro-font">${totalPoints.toLocaleString()}</div>
                </div>
                <div className="flex flex-col gap-4 w-full font-mono">
                   {gameState === 'GAME_OVER' && !hasRevived ? (
                     <button onClick={handleRevive} className="group w-full py-3 md:py-4 bg-yellow-900/50 hover:bg-yellow-800/50 text-yellow-500 border border-yellow-700 transition-all relative overflow-hidden">
-                       <span className="text-sm md:text-lg font-bold relative z-10 flex items-center justify-center gap-2"><RotateCcw className="w-4 h-4 md:w-5 md:h-5" /> RESTART NIGHT {currentStage.id}</span>
-                       <span className="block text-[10px] md:text-xs mt-1 relative z-10 opacity-75">PENALTY: -{Math.ceil(totalPoints / 2)} TOKENS</span>
+                       <span className="text-sm md:text-lg font-bold relative z-10 flex items-center justify-center gap-2"><RotateCcw className="w-4 h-4 md:w-5 md:h-5" /> RESTART FLOOR {currentStage.id}</span>
+                       <span className="block text-[10px] md:text-xs mt-1 relative z-10 opacity-75 uppercase">
+                           PENALTY: -{Math.ceil(totalPoints / 2)} {resultTheme.currency} {/* DYNAMIC CURRENCY */}
+                       </span>
                     </button>
                   ) : gameState === 'GAME_OVER' && hasRevived ? (
                     <div className="w-full py-4 bg-black text-red-900 border border-red-900 text-sm">SYSTEM LOCKED // NO REVIVES LEFT</div>
                   ) : null}
-                  <button onClick={startNewGame} className="w-full py-3 md:py-4 bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700 transition-colors text-sm">NEW GAME (NIGHT 1)</button>
+                  <button onClick={startNewGame} className="w-full py-3 md:py-4 bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700 transition-colors text-sm">NEW GAME (FLOOR 1)</button>
                   
                   {/* EXIT BUTTON ON GAME OVER SCREEN */}
                   <button onClick={handleExit} className="w-full py-3 md:py-4 bg-black hover:bg-zinc-900 text-zinc-500 border border-zinc-800 transition-colors text-sm flex items-center justify-center gap-2">

@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Clock } from 'lucide-react';
@@ -42,7 +43,7 @@ export const Lobby: React.FC = () => {
                         <div className="absolute top-1 right-1 text-[8px] bg-yellow-900 text-yellow-500 px-1">HOST</div>
                     )}
                     <div className="w-8 h-8 md:w-12 md:h-12 bg-black rounded-full border border-zinc-700 mb-2 flex items-center justify-center text-xl md:text-2xl">
-                        {['🐻', '🐰', '🐔', '🦊', '🐊', '🐺'][player.avatarId % 6]}
+                        {['💀', '🧟', '🧛', '🕴️', '🕵️', '🤖'][player.avatarId % 6]}
                     </div>
                     <div className="text-xs md:text-sm font-bold uppercase truncate w-full text-center">{player.nickname}</div>
                     <div className="text-[10px] md:text-xs text-green-600 animate-pulse mt-1">CONNECTED</div>

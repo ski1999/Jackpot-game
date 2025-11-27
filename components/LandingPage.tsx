@@ -28,8 +28,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // Connect implicitly on landing if we have a token (for leaderboard access)
   React.useEffect(() => {
      // Trigger a connect without nickname if just browsing, or ensure connected
-     // Actually service handles this. We need to be connected to fetch leaderboard.
-     // So we'll trigger a connect if we have a token or just generic
      service.connect("GUEST");
   }, []);
 
@@ -47,16 +45,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <Skull className="w-12 h-12 md:w-16 md:h-16 text-red-600 animate-pulse drop-shadow-[0_0_15px_red]" />
              </div>
              <h1 className="text-3xl md:text-5xl retro-font text-red-600 drop-shadow-[0_0_10px_red] tracking-wider">
-               FAZ-SLOTS
+               VOLTAGE VICES
              </h1>
              <p className="text-[10px] md:text-sm text-green-800 font-bold uppercase tracking-[0.5em] animate-pulse">
-               System Initialized
+               Casino Operating System v6.6.6
              </p>
           </div>
 
           {/* Nickname Input */}
           <div className="w-full bg-black border-2 border-green-800 p-3 md:p-4 shadow-[0_0_20px_rgba(0,255,0,0.1)]">
-             <label className="block text-xs text-green-700 mb-2 uppercase">Identify Yourself</label>
+             <label className="block text-xs text-green-700 mb-2 uppercase">Identify Gambler</label>
              <div className="relative">
                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-green-600">{">"}</span>
                 <input 
@@ -80,7 +78,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <div className="absolute inset-0 bg-green-500/10 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300 skew-x-12" />
                 <div className="flex items-center justify-center gap-3 relative z-10">
                    <Play className="w-4 h-4 md:w-5 md:h-5" />
-                   <span className="text-sm md:text-lg font-bold">SOLO NIGHT SHIFT</span>
+                   <span className="text-sm md:text-lg font-bold">SOLO SESSION</span>
                 </div>
              </button>
 
@@ -113,7 +111,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                    className="w-full py-3 bg-black border border-zinc-800 text-yellow-600 hover:text-yellow-400 hover:border-yellow-700 transition-colors flex items-center justify-center gap-2 text-xs md:text-sm"
                  >
                     <Trophy className="w-4 h-4" />
-                    WEEKLY TOP 10
+                    HIGH ROLLERS
                  </button>
                  <button 
                    onClick={() => { soundEngine.playClick(); onOpenSettings(); }}
@@ -126,7 +124,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
 
           <div className="text-[10px] text-zinc-700 text-center max-w-xs leading-relaxed">
-             WARNING: Fazbear Entertainment is not responsible for accidental death, dismemberment, or digital entrapment.
+             WARNING: The House always wins. Participation implies consent to bio-hazard exposure.
           </div>
        </div>
 
