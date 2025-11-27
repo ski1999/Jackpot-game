@@ -1,6 +1,5 @@
-
 import { IGameService, GameListener, ErrorListener } from './IGameService';
-import { MultiplayerConfig, MultiplayerRoom } from '../types';
+import { MultiplayerConfig, MultiplayerRoom, PlayerStats } from '../types';
 import { CONFIG } from '../config';
 
 /**
@@ -13,6 +12,7 @@ export class SocketGameService implements IGameService {
   private errorListeners: ErrorListener[] = [];
   private playerId: string = '';
   private persistentToken: string | null = null;
+  private pendingLeaderboardResolve: ((stats: PlayerStats[]) => void) | null = null;
 
   constructor() {
     console.log("Initializing Production Socket Service...");
@@ -32,9 +32,14 @@ export class SocketGameService implements IGameService {
     return () => { this.errorListeners = this.errorListeners.filter(l => l !== listener); };
   }
 
-  connect(nickname: string) {
+  connect(nickname: string, manualToken?: string) {
     this.socket = new WebSocket(CONFIG.SOCKET_URL);
     
+    // Override persistence if manual token provided (Recovery)
+    if (manualToken) {
+        this.persistentToken = manualToken;
+    }
+
     this.socket.onopen = () => {
         console.log("Connected to Game Server");
         // Send handshake with existing token if we have one
@@ -72,6 +77,12 @@ export class SocketGameService implements IGameService {
                   // Server sent back our Persistent ID (either confirmed old one or generated new one)
                   this.persistentToken = data.userId;
                   localStorage.setItem('faz_token', data.userId);
+              }
+              break;
+          case 'LEADERBOARD_DATA':
+              if (this.pendingLeaderboardResolve) {
+                  this.pendingLeaderboardResolve(data.payload);
+                  this.pendingLeaderboardResolve = null;
               }
               break;
       }
@@ -113,6 +124,29 @@ export class SocketGameService implements IGameService {
     this.send('ACTION_CUT_WIRE', { wireId });
   }
 
+  getLeaderboard(): Promise<PlayerStats[]> {
+      return new Promise((resolve) => {
+          this.pendingLeaderboardResolve = resolve;
+          this.send('GET_LEADERBOARD', {});
+          
+          // Timeout fallback
+          setTimeout(() => {
+              if (this.pendingLeaderboardResolve) {
+                  resolve([]);
+                  this.pendingLeaderboardResolve = null;
+              }
+          }, 5000);
+      });
+  }
+
+  submitScore(score: number, stages: number = 0): void {
+      this.send('SUBMIT_SCORE', { score, stages });
+  }
+
+  sendTelemetry(action: string, details: any): void {
+      this.send('RECORD_TELEMETRY', { action, details });
+  }
+
   getCurrentRoom() {
     return this.room;
   }
@@ -125,7 +159,13 @@ export class SocketGameService implements IGameService {
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
           this.socket.send(JSON.stringify({ type, payload }));
       } else {
-          this.notifyError("NOT CONNECTED");
+          // If socket is closed (e.g. Single Player offline), we just ignore or log
+          // In a real app we might queue these
+          if (type === 'RECORD_TELEMETRY') {
+              console.log('[Telemetry Skipped - Offline]', payload);
+          } else {
+              this.notifyError("NOT CONNECTED");
+          }
       }
   }
 }

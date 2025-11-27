@@ -1,46 +1,91 @@
-
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, AlertTriangle, Zap, Coins, Scissors, RotateCcw, Skull, Trophy, Battery, Activity, Wrench, ArrowLeft } from 'lucide-react';
+import { Settings, AlertTriangle, Zap, Coins, Scissors, RotateCcw, Skull, Trophy, Battery, Activity, Wrench, ArrowLeft, Save, Trash2, Play } from 'lucide-react';
 import { Reel } from './Reel';
 import { Lever } from './Lever';
 import { SettingsPanel } from './SettingsPanel';
 import { STAGES, SYMBOL_SETS, WIRE_COLORS, SPEED_CONFIG, STORY_LOGS } from '../constants';
-import { StageConfig, Wire, SlotSymbol, GameSettings } from '../types';
+import { StageConfig, Wire, SlotSymbol, GameSettings, SinglePlayerSaveState } from '../types';
 import { soundEngine } from '../audio';
+import { useGame } from '../contexts/GameContext';
 
 interface SinglePlayerGameProps {
     onBack: () => void;
 }
 
+const STORAGE_KEY = 'faz_single_save';
+
 export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) => {
+  const { service } = useGame();
+  
+  // Game State
   const [stageIndex, setStageIndex] = useState(0);
   const [totalPoints, setTotalPoints] = useState(0);
-  const [gameState, setGameState] = useState<'IDLE' | 'SPINNING' | 'JACKPOT' | 'GAME_OVER' | 'VICTORY'>('IDLE');
-  const [view, setView] = useState<'front' | 'back'>('front');
+  const [jackpotProb, setJackpotProb] = useState(0.15);
+  const [wires, setWires] = useState<Wire[]>([]);
   const [hasRevived, setHasRevived] = useState(false);
   
-  // Story Mode States
+  // UI State
+  const [gameState, setGameState] = useState<'IDLE' | 'SPINNING' | 'JACKPOT' | 'GAME_OVER' | 'VICTORY'>('IDLE');
+  const [view, setView] = useState<'front' | 'back'>('front');
   const [showStory, setShowStory] = useState(false);
   const [showCoinsBurst, setShowCoinsBurst] = useState(false);
-
-  const currentStage = STAGES[stageIndex] || STAGES[0];
-  const currentSymbols = useMemo(() => SYMBOL_SETS[currentStage.symbolSetId] || SYMBOL_SETS['PIZZERIA'], [currentStage]);
-  
-  // Game Settings State
-  const [settings, setSettings] = useState<GameSettings>({ volume: 0.5, speed: 'NORMAL', storyMode: false });
-  const [showSettings, setShowSettings] = useState(false);
-
-  const [jackpotProb, setJackpotProb] = useState(currentStage.baseProb);
-  const [wires, setWires] = useState<Wire[]>([]);
   const [reelTargets, setReelTargets] = useState<[SlotSymbol, SlotSymbol, SlotSymbol] | null>(null);
   const [showWireModal, setShowWireModal] = useState<number | null>(null);
   const [message, setMessage] = useState<string>("");
+  const [showResumeModal, setShowResumeModal] = useState(false);
 
-  // Update sound engine when settings change
+  // Telemetry ref
+  const lastReadyTime = useRef<number>(Date.now());
+
+  // Settings
+  const [settings, setSettings] = useState<GameSettings>({ volume: 0.5, speed: 'NORMAL', storyMode: false });
+  const [showSettings, setShowSettings] = useState(false);
+
+  const currentStage = STAGES[stageIndex] || STAGES[0];
+  const currentSymbols = useMemo(() => SYMBOL_SETS[currentStage.symbolSetId] || SYMBOL_SETS['PIZZERIA'], [currentStage]);
+
+  // Initial Load Check
   useEffect(() => {
-    soundEngine.setVolume(settings.volume);
-  }, [settings.volume]);
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+          try {
+              const parsed: SinglePlayerSaveState = JSON.parse(savedData);
+              // Basic validation
+              if (parsed && typeof parsed.stageIndex === 'number') {
+                  setShowResumeModal(true);
+                  return; // Don't init new stage yet
+              }
+          } catch (e) {
+              console.error("Save file corrupted", e);
+              localStorage.removeItem(STORAGE_KEY);
+          }
+      }
+      // If no save, init fresh
+      initStage(STAGES[0]);
+  }, []);
+
+  // Set Ready Time when IDLE
+  useEffect(() => {
+      if (gameState === 'IDLE') {
+          lastReadyTime.current = Date.now();
+      }
+  }, [gameState]);
+
+  // Auto-Save Effect
+  useEffect(() => {
+      if (gameState === 'IDLE' && wires.length > 0 && !showResumeModal) {
+          const saveState: SinglePlayerSaveState = {
+              stageIndex,
+              totalPoints,
+              wires,
+              hasRevived,
+              jackpotProb
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(saveState));
+      }
+  }, [gameState, stageIndex, totalPoints, wires, hasRevived, jackpotProb, showResumeModal]);
+
 
   const initStage = useCallback((stage: StageConfig) => {
     setJackpotProb(stage.baseProb);
@@ -59,15 +104,46 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
     
     setWires(newWires);
     setReelTargets(null);
+    lastReadyTime.current = Date.now();
   }, []);
 
+  // Update sound engine when settings change
   useEffect(() => {
-    initStage(currentStage);
-  }, [stageIndex, initStage]);
+    soundEngine.setVolume(settings.volume);
+  }, [settings.volume]);
+
+  const handleResume = () => {
+      soundEngine.playClick();
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+          const parsed: SinglePlayerSaveState = JSON.parse(savedData);
+          setStageIndex(parsed.stageIndex);
+          setTotalPoints(parsed.totalPoints);
+          setWires(parsed.wires);
+          setHasRevived(parsed.hasRevived);
+          setJackpotProb(parsed.jackpotProb);
+          
+          setMessage(`RESUMING NIGHT ${parsed.stageIndex + 1}`);
+          setShowResumeModal(false);
+          setGameState('IDLE');
+      } else {
+          startNewGame();
+      }
+  };
+
+  const handleGameOver = useCallback((points: number) => {
+      // Clear save on game over
+      localStorage.removeItem(STORAGE_KEY);
+      // Submit Score with Stage Index (Stages Cleared)
+      service.submitScore(points, stageIndex);
+  }, [service, stageIndex]);
 
   const advanceStage = useCallback(() => {
     if (stageIndex + 1 < STAGES.length) {
        setStageIndex(prev => prev + 1);
+       // We need to re-init wires for next stage
+       initStage(STAGES[stageIndex + 1]); 
+       
        setGameState('IDLE');
        setView('front');
        setShowStory(false);
@@ -76,8 +152,9 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
        setMessage("SHIFT COMPLETE. YOU SURVIVED.");
        setGameState('VICTORY');
        soundEngine.playJackpot();
+       handleGameOver(totalPoints);
     }
-  }, [stageIndex]);
+  }, [stageIndex, totalPoints, handleGameOver, initStage]);
 
   const handleSpin = () => {
     if (gameState !== 'IDLE') return;
@@ -86,8 +163,16 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
     setMessage("INITIATING SEQUENCE...");
     soundEngine.playSpin();
 
+    const reactionTime = Date.now() - lastReadyTime.current;
     const isJackpot = Math.random() < jackpotProb;
     const speedConfig = SPEED_CONFIG[settings.speed];
+
+    // Record Telemetry
+    service.sendTelemetry('SPIN', {
+        roundPhase: currentStage.name,
+        reactionTimeMs: reactionTime,
+        outcome: isJackpot ? 'HIT' : 'SAFE'
+    });
 
     setTimeout(() => {
       if (isJackpot) {
@@ -138,11 +223,21 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
     if (!wire || wire.status === 'cut') return;
     
     soundEngine.playClick();
+    const reactionTime = Date.now() - lastReadyTime.current;
+
+    // Record Telemetry
+    service.sendTelemetry('CUT_WIRE', {
+        roundPhase: currentStage.name,
+        targetId: wireId.toString(),
+        reactionTimeMs: reactionTime,
+        outcome: wire.isBomb ? 'ELIMINATED' : 'ODDS_CHANGE'
+    });
 
     if (wire.isBomb) {
       soundEngine.playJumpscare();
       setWires(prev => prev.map(w => w.id === wireId ? { ...w, status: 'cut' } : w));
       setGameState('GAME_OVER');
+      handleGameOver(totalPoints);
       setMessage("JUMPSCARE_LOADED.EXE");
       setView('front'); 
     } else {
@@ -164,6 +259,9 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
 
   const startNewGame = () => {
     soundEngine.playClick();
+    localStorage.removeItem(STORAGE_KEY);
+    setShowResumeModal(false);
+    
     setStageIndex(0);
     setTotalPoints(0);
     setHasRevived(false);
@@ -171,6 +269,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
     setView('front');
     setShowStory(false);
     setShowCoinsBurst(false);
+    initStage(STAGES[0]);
   };
 
   const handleRevive = () => {
@@ -193,6 +292,13 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
          advanceStage();
      }
   };
+  
+  const handleExit = () => {
+      soundEngine.playClick();
+      // If exiting mid-game (not game over), the useEffect already saved state.
+      // Just go back.
+      onBack();
+  }
 
   const formatProb = (p: number) => {
     if (p < 0.01) return "<1%";
@@ -203,11 +309,36 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
     <div className={`min-h-screen w-full flex flex-col items-center justify-center bg-zinc-950 crt-flicker transition-colors duration-1000 overflow-hidden relative checkerboard`}>
       <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_0%,black_90%)] pointer-events-none z-10" />
 
+      {/* --- RESUME MODAL --- */}
+      <AnimatePresence>
+        {showResumeModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4">
+             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-zinc-900 border-2 border-green-700 p-6 max-w-sm w-full shadow-[0_0_50px_rgba(0,255,0,0.1)] text-center relative overflow-hidden">
+                <div className="absolute inset-0 scanlines opacity-50 pointer-events-none"></div>
+                <div className="relative z-10">
+                    <Save className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                    <h2 className="text-xl retro-font text-green-500 mb-2">SAVE DATA FOUND</h2>
+                    <p className="text-zinc-400 text-xs font-mono mb-6">UNFINISHED SHIFT DETECTED IN MEMORY BANK.</p>
+                    
+                    <div className="flex flex-col gap-3">
+                        <button onClick={handleResume} className="w-full py-3 bg-green-900/30 border border-green-600 text-green-400 hover:bg-green-900/50 hover:text-white flex items-center justify-center gap-2 transition-all">
+                           <Play className="w-4 h-4" /> RESUME SHIFT
+                        </button>
+                        <button onClick={startNewGame} className="w-full py-3 bg-zinc-900 border border-zinc-700 text-zinc-500 hover:border-red-500 hover:text-red-500 flex items-center justify-center gap-2 transition-all">
+                           <Trash2 className="w-4 h-4" /> DISCARD & START NEW
+                        </button>
+                    </div>
+                </div>
+             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {showStory && <div className="fixed inset-0 z-[100] cursor-pointer" onClick={handleStoryClick}></div>}
 
       <div className="absolute top-2 left-2 right-2 flex justify-between items-start z-40 pointer-events-none text-green-500 font-mono">
          <div className="bg-black/80 p-2 md:p-4 border-2 border-green-900/50 shadow-[0_0_15px_rgba(0,255,0,0.1)] pointer-events-auto max-w-[50%]">
-             <button onClick={onBack} className="text-[10px] md:text-xs text-zinc-500 hover:text-white flex items-center gap-1 mb-1 md:mb-2">
+             <button onClick={handleExit} className="text-[10px] md:text-xs text-zinc-500 hover:text-white flex items-center gap-1 mb-1 md:mb-2">
                  <ArrowLeft className="w-3 h-3"/> EXIT
              </button>
             <h1 className="text-base md:text-2xl mb-1 md:mb-2 flex items-center gap-2 truncate">
@@ -243,7 +374,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
           {/* FRONT */}
           <div className="absolute inset-0 backface-hidden p-3 md:p-4 flex flex-col items-center shadow-2xl bg-zinc-900 border-x-8 border-y-8 border-black">
              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-felt.png')] opacity-30 pointer-events-none" />
-             <Lever onPull={handleSpin} disabled={gameState !== 'IDLE'} speed={settings.speed} />
+             <Lever onPull={handleSpin} disabled={gameState !== 'IDLE' || showResumeModal} speed={settings.speed} />
 
              <div className="w-full bg-black border-4 border-zinc-800 p-2 md:p-4 mb-2 text-center shadow-inner relative overflow-hidden">
                <h2 className="text-xl md:text-3xl retro-font text-red-600 animate-pulse drop-shadow-[0_0_5px_red]">FAZ-SLOTS</h2>
@@ -279,7 +410,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
                 <div className="text-[8px] md:text-[10px] text-zinc-600 max-w-[120px] font-mono">PULL LEVER TO START SHIFT</div>
                 <button 
                   onClick={toggleView}
-                  disabled={gameState !== 'IDLE'}
+                  disabled={gameState !== 'IDLE' || showResumeModal}
                   className="group relative p-2 md:p-3 bg-zinc-800 hover:bg-zinc-700 border-2 border-black text-white shadow-lg active:translate-y-1 disabled:opacity-50 flex items-center gap-2"
                 >
                   <span className="text-[10px] font-mono hidden md:inline">REAR ACCESS</span>
@@ -384,6 +515,11 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBack }) =>
                     <div className="w-full py-4 bg-black text-red-900 border border-red-900 text-sm">SYSTEM LOCKED // NO REVIVES LEFT</div>
                   ) : null}
                   <button onClick={startNewGame} className="w-full py-3 md:py-4 bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700 transition-colors text-sm">NEW GAME (NIGHT 1)</button>
+                  
+                  {/* EXIT BUTTON ON GAME OVER SCREEN */}
+                  <button onClick={handleExit} className="w-full py-3 md:py-4 bg-black hover:bg-zinc-900 text-zinc-500 border border-zinc-800 transition-colors text-sm flex items-center justify-center gap-2">
+                     <ArrowLeft className="w-4 h-4" /> EXIT TO MENU
+                  </button>
                </div>
              </motion.div>
           </motion.div>

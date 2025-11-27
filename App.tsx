@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { LandingPage } from './components/LandingPage';
 import { SinglePlayerGame } from './components/SinglePlayerGame';
@@ -50,14 +51,20 @@ const GameRouter = () => {
 
   const handleStartMultiplayer = () => {
     if (nickname) {
-        // Service now handles checking localStorage for token automatically
-        // inside SocketGameService implementation
+        // Ensure connection for multiplayer flow
         service.connect(nickname);
         setScreen('MULTI_MENU');
     } else {
         soundEngine.playWarning();
     }
   };
+  
+  const handleStartSingle = () => {
+      // Connect to update nickname in service (for leaderboard)
+      // Use nickname or fallback to ID/Guest
+      service.connect(nickname || "USER-" + Math.floor(Math.random()*1000));
+      setScreen('SINGLE');
+  }
 
   return (
     <>
@@ -65,7 +72,7 @@ const GameRouter = () => {
           <LandingPage 
             nickname={nickname}
             setNickname={setNickname}
-            onStartSingle={() => setScreen('SINGLE')}
+            onStartSingle={handleStartSingle}
             onStartMulti={handleStartMultiplayer}
             onOpenSettings={() => setShowSettings(true)}
           />

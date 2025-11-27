@@ -20,6 +20,14 @@ export interface Wire {
   multiplier: number; // How much it multiplies the current probability
 }
 
+export interface SinglePlayerSaveState {
+  stageIndex: number;
+  totalPoints: number;
+  wires: Wire[];
+  hasRevived: boolean;
+  jackpotProb: number;
+}
+
 export interface SlotSymbol {
   id: string;
   char?: string; // Fallback
@@ -51,6 +59,14 @@ export interface Player {
   isHost: boolean;
   status: PlayerStatus;
   avatarId: number; // For visual variety
+}
+
+export interface PlayerStats {
+  nickname: string;
+  wins: number;
+  losses: number;
+  games_played: number;
+  high_score: number;
 }
 
 export interface MultiplayerConfig {

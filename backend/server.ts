@@ -1,4 +1,3 @@
-
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import { MemoryDatabase, RedisDatabase } from './database';
@@ -9,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { StatsDatabase } from './stats';
 import { TelemetryService } from './telemetry';
+import { WeeklyArchiver } from './archiver';
 import { randomUUID } from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -61,6 +61,7 @@ const wss = new WebSocketServer({ server });
 const db = USE_REDIS ? new RedisDatabase() : new MemoryDatabase();
 const statsDb = USE_POSTGRES ? new StatsDatabase() : null;
 const telemetry = new TelemetryService();
+const archiver = statsDb ? new WeeklyArchiver(statsDb) : null;
 
 console.log(`Faz-Slots Backend running on port ${PORT} (Redis: ${USE_REDIS}, Postgres: ${USE_POSTGRES})`);
 
@@ -113,6 +114,41 @@ wss.on('connection', (ws: WebSocket) => {
               id: currentPlayerId,
               userId: persistentUserId 
           }));
+          break;
+
+        case 'GET_LEADERBOARD':
+          if (statsDb) {
+              const leaderboard = await statsDb.getLeaderboard();
+              ws.send(JSON.stringify({ type: 'LEADERBOARD_DATA', payload: leaderboard }));
+          } else {
+              ws.send(JSON.stringify({ type: 'LEADERBOARD_DATA', payload: [] }));
+          }
+          break;
+
+        case 'SUBMIT_SCORE':
+          if (statsDb && persistentUserId) {
+              const { score, stages } = payload;
+              // Pass stages cleared to update 'wins' count
+              await statsDb.updateHighScore(persistentUserId, currentNickname, score, stages || 0);
+          }
+          break;
+
+        case 'RECORD_TELEMETRY':
+          // Accepts generic actions from client (Single Player Mode)
+          {
+             const { action, details } = payload;
+             telemetry.recordEvent({
+                 timestamp: new Date().toISOString(),
+                 roomId: 'SINGLE_PLAYER',
+                 playerId: persistentUserId || currentPlayerId || 'UNKNOWN',
+                 nickname: currentNickname,
+                 roundPhase: details.roundPhase || 'UNKNOWN',
+                 action: action,
+                 reactionTimeMs: details.reactionTimeMs || 0,
+                 outcome: details.outcome || 'UNKNOWN',
+                 targetId: details.targetId
+             });
+          }
           break;
 
         case 'CREATE_ROOM':

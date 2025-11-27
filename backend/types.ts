@@ -22,6 +22,14 @@ export interface Player {
   socketId?: string; // Backend specific: map to WS connection
 }
 
+export interface PlayerStats {
+  nickname: string;
+  wins: number;
+  losses: number;
+  games_played: number;
+  high_score: number;
+}
+
 export interface MultiplayerConfig {
   roomCode: string;
   password?: string;

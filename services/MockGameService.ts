@@ -1,6 +1,5 @@
-
 import { IGameService, GameListener, ErrorListener } from './IGameService';
-import { MultiplayerConfig, MultiplayerRoom, Player, Wire } from '../types';
+import { MultiplayerConfig, MultiplayerRoom, Player, Wire, PlayerStats } from '../types';
 import { MOCK_BOT_NAMES, WIRE_COLORS } from '../constants';
 
 export class MockGameService implements IGameService {
@@ -12,6 +11,15 @@ export class MockGameService implements IGameService {
   
   // Simulation Intervals
   private botInterval: any = null;
+
+  // Internal Mock Leaderboard State
+  private mockLeaderboard: PlayerStats[] = [
+      { nickname: "PURPLE_GUY", high_score: 9999, wins: 50, losses: 2, games_played: 52 },
+      { nickname: "PHONE_GUY", high_score: 5400, wins: 12, losses: 5, games_played: 17 },
+      { nickname: "SCHMIDT", high_score: 4200, wins: 8, losses: 8, games_played: 16 },
+      { nickname: "JEREMY", high_score: 3100, wins: 5, losses: 10, games_played: 15 },
+      { nickname: "FRITZ", high_score: 2500, wins: 3, losses: 2, games_played: 5 },
+  ];
 
   constructor() {
     this.playerId = 'p-' + Date.now();
@@ -45,14 +53,16 @@ export class MockGameService implements IGameService {
 
   // --- Connection ---
 
-  connect(nickname: string) {
+  connect(nickname: string, manualToken?: string) {
     this.nickname = nickname;
-    this.playerId = 'p-' + Date.now(); // Reset ID on connect for mock
+    this.playerId = manualToken || 'p-' + Date.now(); 
     
     // Simulate checking local storage in mock
-    const existing = localStorage.getItem('faz_mock_token');
-    if (!existing) {
-        localStorage.setItem('faz_mock_token', 'mock-uuid-' + Date.now());
+    if (!manualToken) {
+        const existing = localStorage.getItem('faz_mock_token');
+        if (!existing) {
+            localStorage.setItem('faz_mock_token', 'mock-uuid-' + Date.now());
+        }
     }
   }
 
@@ -212,6 +222,46 @@ export class MockGameService implements IGameService {
       }
   }
 
+  // --- Leaderboard ---
+  
+  async getLeaderboard(): Promise<PlayerStats[]> {
+      // Sort desc
+      return [...this.mockLeaderboard].sort((a, b) => b.high_score - a.high_score);
+  }
+
+  submitScore(score: number, stages: number = 0): void {
+      console.log(`[Mock] Score submitted: ${score} (Stages: ${stages}) for ${this.nickname}`);
+      
+      const existingIdx = this.mockLeaderboard.findIndex(p => p.nickname === this.nickname);
+      
+      if (existingIdx !== -1) {
+          // Update existing
+          const entry = this.mockLeaderboard[existingIdx];
+          entry.high_score = Math.max(entry.high_score, score);
+          entry.wins += stages; // Accumulate stages as 'wins'
+          entry.games_played++;
+      } else {
+          // Add new
+          this.mockLeaderboard.push({
+              nickname: this.nickname,
+              high_score: score,
+              wins: stages,
+              losses: 0,
+              games_played: 1
+          });
+      }
+      
+      // Keep only top 10
+      this.mockLeaderboard.sort((a, b) => b.high_score - a.high_score);
+      if (this.mockLeaderboard.length > 10) {
+          this.mockLeaderboard.length = 10;
+      }
+  }
+
+  sendTelemetry(action: string, details: any): void {
+      console.log(`[Mock Telemetry] Action: ${action}`, details);
+  }
+
   // --- Internals ---
   
   private startPhase() {
@@ -339,6 +389,11 @@ export class MockGameService implements IGameService {
   private advanceTurn() {
       if (!this.room) return;
       this.room.currentTurnIndex = (this.room.currentTurnIndex + 1) % this.room.players.length;
+      this.advanceTurnLogic();
+  }
+  
+  private advanceTurnLogic() {
+      if (!this.room) return;
       this.ensureValidPlayer();
       this.prepareTurn();
   }
@@ -356,7 +411,7 @@ export class MockGameService implements IGameService {
           } else {
               this.room.currentTurnIndex = 0;
               // Reset cycle to find first valid player
-              this.startPhase(); // Logic moved inside startPhase to handle validation
+              this.startPhase(); 
           }
           this.notify();
       }, 3000);
@@ -387,13 +442,11 @@ export class MockGameService implements IGameService {
       }
       if (this.room.phase.includes('GAME') && !this.room.turnResult && !this.room.isProcessing) {
           const activePlayer = this.room.players[this.room.currentTurnIndex];
-          if (activePlayer.id === this.playerId) return; // My turn, don't bot
+          if (activePlayer.id === this.playerId) return; 
           
-          // FIX: Don't act if eliminated or winner
           if (activePlayer.status === 'ELIMINATED' || activePlayer.status === 'WINNER') return;
 
           if (Math.random() > 0.3) {
-             // Bot just calls spin() and lets the new async logic handle delays
              this.spin();
           }
       }

@@ -16,3 +16,9 @@ CREATE TABLE IF NOT EXISTS user_stats (
 -- Index: idx_user_stats_wins
 -- Optimizes queries for "Top Players" or Leaderboards based on wins.
 CREATE INDEX IF NOT EXISTS idx_user_stats_wins ON user_stats(wins DESC);
+
+-- 1. Add the high_score column for Single Player tracking
+ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS high_score INTEGER DEFAULT 0;
+
+-- 2. Create an index to make the Leaderboard query fast
+CREATE INDEX IF NOT EXISTS idx_user_stats_high_score ON user_stats(high_score DESC);

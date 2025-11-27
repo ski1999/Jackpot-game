@@ -1,8 +1,11 @@
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Settings, Users, Play, Skull } from 'lucide-react';
+
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Settings, Users, Play, Skull, Trophy } from 'lucide-react';
 import { soundEngine } from '../audio';
+import { Leaderboard } from './Leaderboard';
+import { useGame } from '../contexts/GameContext';
 
 interface LandingPageProps {
   onStartSingle: () => void;
@@ -19,6 +22,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   nickname,
   setNickname
 }) => {
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const { service } = useGame();
+
+  // Connect implicitly on landing if we have a token (for leaderboard access)
+  React.useEffect(() => {
+     // Trigger a connect without nickname if just browsing, or ensure connected
+     // Actually service handles this. We need to be connected to fetch leaderboard.
+     // So we'll trigger a connect if we have a token or just generic
+     service.connect("GUEST");
+  }, []);
+
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-zinc-950 relative overflow-hidden text-green-500 font-mono p-4">
        {/* Background */}
@@ -93,19 +107,32 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 )}
              </button>
 
-             <button 
-               onClick={() => { soundEngine.playClick(); onOpenSettings(); }}
-               className="w-full py-3 bg-black border border-zinc-800 text-zinc-500 hover:text-white hover:border-zinc-600 transition-colors flex items-center justify-center gap-2 text-xs md:text-sm"
-             >
-                <Settings className="w-4 h-4" />
-                SYSTEM CONFIG
-             </button>
+             <div className="grid grid-cols-2 gap-3">
+                 <button 
+                   onClick={() => { soundEngine.playClick(); setShowLeaderboard(true); }}
+                   className="w-full py-3 bg-black border border-zinc-800 text-yellow-600 hover:text-yellow-400 hover:border-yellow-700 transition-colors flex items-center justify-center gap-2 text-xs md:text-sm"
+                 >
+                    <Trophy className="w-4 h-4" />
+                    WEEKLY TOP 10
+                 </button>
+                 <button 
+                   onClick={() => { soundEngine.playClick(); onOpenSettings(); }}
+                   className="w-full py-3 bg-black border border-zinc-800 text-zinc-500 hover:text-white hover:border-zinc-600 transition-colors flex items-center justify-center gap-2 text-xs md:text-sm"
+                 >
+                    <Settings className="w-4 h-4" />
+                    SYSTEM CONFIG
+                 </button>
+             </div>
           </div>
 
           <div className="text-[10px] text-zinc-700 text-center max-w-xs leading-relaxed">
              WARNING: Fazbear Entertainment is not responsible for accidental death, dismemberment, or digital entrapment.
           </div>
        </div>
+
+       <AnimatePresence>
+         {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
+       </AnimatePresence>
     </div>
   );
 };
