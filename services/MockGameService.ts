@@ -85,7 +85,8 @@ export class MockGameService implements IGameService {
       results: { losers: [], winners: [], survivors: [] },
       currentWires: [],
       currentProb: 0,
-      lastActionMessage: 'WAITING FOR PLAYERS...'
+      lastActionMessage: 'WAITING FOR PLAYERS...',
+      isProcessing: false
     };
 
     this.notify();
@@ -131,7 +132,8 @@ export class MockGameService implements IGameService {
         currentTurnIndex: 0,
         losersFound: 0,
         winnersFound: 0,
-        results: { losers: [], winners: [], survivors: [] }
+        results: { losers: [], winners: [], survivors: [] },
+        isProcessing: false
     };
     
     this.notify();
@@ -146,10 +148,16 @@ export class MockGameService implements IGameService {
 
   startGame() {
     if (!this.room) return;
+    // RESET GAME STATE
     this.room.phase = 'GAME_LOSER_ROUND';
+    this.room.losersFound = 0;
+    this.room.winnersFound = 0;
+    this.room.results = { losers: [], winners: [], survivors: [] };
     this.room.players.forEach(p => p.status = 'PLAYING');
     this.room.currentTurnIndex = 0;
-    this.initTurn();
+    this.room.lastActionMessage = "NEW GAME STARTED";
+    
+    this.startPhase(); 
     this.notify();
   }
 
@@ -157,35 +165,59 @@ export class MockGameService implements IGameService {
 
   spin() {
      if (!this.room) return;
-     const hit = Math.random() < (this.room.currentProb || 0.1);
-     this.handleTurnResult(hit);
+     if (this.room.isProcessing) return; // Block input
+
+     this.room.isProcessing = true;
+     const player = this.room.players[this.room.currentTurnIndex];
+     this.room.lastActionMessage = `${player.nickname} IS SPINNING...`;
+     this.notify();
+
+     // Match Server Delay Logic
+     setTimeout(() => {
+        if (!this.room) return;
+        const hit = Math.random() < (this.room.currentProb || 0.1);
+        this.room.turnResult = { hit };
+        this.notify();
+
+        setTimeout(() => {
+            this.handleTurnResult(hit);
+        }, 3000);
+     }, 2000);
   }
 
   cutWire(wireId: number) {
       if (!this.room || !this.room.currentWires) return;
+      if (this.room.isProcessing) return; // Block input
       
       const wire = this.room.currentWires.find(w => w.id === wireId);
       if (!wire || wire.status === 'cut') return;
 
+      this.room.isProcessing = true;
       wire.status = 'cut';
       
       if (wire.isBomb) {
-          this.handleTurnResult(true);
+          this.room.turnResult = { hit: true };
+          this.notify();
+          setTimeout(() => {
+              this.handleTurnResult(true);
+          }, 3000);
       } else {
           this.room.currentProb = Math.min(0.99, (this.room.currentProb || 0.1) * wire.multiplier);
+          this.room.lastActionMessage = "WIRE BYPASSED. ODDS INCREASED.";
           this.notify();
+
+          setTimeout(() => {
+              this.handleTurnResult(false);
+          }, 2000);
       }
   }
 
   // --- Internals ---
-
-  private initTurn() {
+  
+  private startPhase() {
       if (!this.room) return;
-      const player = this.room.players[this.room.currentTurnIndex];
-      this.room.lastActionMessage = `${player.nickname}'S TURN`;
-      this.room.turnStartTime = Date.now();
       this.room.currentProb = this.room.phase === 'GAME_LOSER_ROUND' ? 0.10 : 0.15;
-
+      
       const wireCount = 6;
       const newWires: Wire[] = Array.from({ length: wireCount }).map((_, i) => ({
         id: i,
@@ -209,68 +241,106 @@ export class MockGameService implements IGameService {
           newWires[trapIndex].isBomb = true;
       }
       this.room.currentWires = newWires;
+      
+      this.ensureValidPlayer();
+      this.prepareTurn();
+  }
+
+  private ensureValidPlayer() {
+      if (!this.room) return;
+      let loopCount = 0;
+      
+      if (this.room.currentTurnIndex >= this.room.players.length) {
+          this.room.currentTurnIndex = 0;
+      }
+      
+      while (
+          (this.room.players[this.room.currentTurnIndex].status === 'ELIMINATED' || this.room.players[this.room.currentTurnIndex].status === 'WINNER') 
+          && loopCount < this.room.players.length
+      ) {
+          this.room.currentTurnIndex = (this.room.currentTurnIndex + 1) % this.room.players.length;
+          loopCount++;
+      }
+  }
+
+  private prepareTurn() {
+      if (!this.room) return;
+      const player = this.room.players[this.room.currentTurnIndex];
+      this.room.lastActionMessage = `${player.nickname}'S TURN`;
+      this.room.turnStartTime = Date.now();
       this.room.turnResult = undefined;
       this.notify();
   }
 
   private handleTurnResult(hit: boolean) {
       if (!this.room) return;
-      this.room.turnResult = { hit };
-      this.notify(); 
-
       const player = this.room.players[this.room.currentTurnIndex];
+
+      this.room.turnResult = undefined; 
+      this.room.isProcessing = false; // UNLOCK
       
-      setTimeout(() => {
-          if (!this.room) return;
-          this.room.turnResult = undefined; 
+      console.log(`[Mock] Processing Turn: ${player.nickname}, Hit: ${hit}, Status: ${player.status}`);
 
-          if (this.room.phase === 'GAME_LOSER_ROUND') {
-              if (hit) {
-                  player.status = 'ELIMINATED';
-                  this.room.losersFound++;
-                  this.room.results.losers.push(player);
-                  this.room.lastActionMessage = `${player.nickname} ELIMINATED!`;
-              } else {
-                  this.room.lastActionMessage = `${player.nickname} SURVIVED.`;
-              }
+      // Guard: If player already processed, ignore (prevent double push)
+      if (player.status === 'ELIMINATED' || player.status === 'WINNER') {
+          this.notify();
+          return;
+      }
 
-              if (this.room.losersFound >= this.room.config.numLosers) {
-                  this.transitionPhase('GAME_WINNER_ROUND');
+      if (this.room.phase === 'GAME_LOSER_ROUND') {
+          if (hit) {
+              if (this.room.results.losers.some(l => l.id === player.id)) {
+                  console.warn("Already in losers list");
                   return;
               }
-          } else if (this.room.phase === 'GAME_WINNER_ROUND') {
-              if (hit) {
-                  player.status = 'WINNER';
-                  this.room.winnersFound++;
-                  this.room.results.winners.push(player);
-                  this.room.lastActionMessage = `${player.nickname} WON!`;
-              } else {
-                  this.room.lastActionMessage = `${player.nickname} NO PRIZE.`;
-              }
-
-              if (this.room.winnersFound >= this.room.config.numWinners) {
-                  this.transitionPhase('RESULTS');
-                  return;
-              }
+              player.status = 'ELIMINATED';
+              this.room.losersFound++;
+              this.room.results.losers.push(player);
+              this.room.lastActionMessage = `${player.nickname} ELIMINATED!`;
+          } else {
+              this.room.lastActionMessage = `${player.nickname} SURVIVED.`;
           }
 
-          this.advanceTurn();
-      }, 3000);
+          if (this.room.losersFound >= this.room.config.numLosers) {
+              this.transitionPhase('GAME_WINNER_ROUND');
+              return;
+          }
+      } else if (this.room.phase === 'GAME_WINNER_ROUND') {
+          if (hit) {
+              if (this.room.results.winners.some(w => w.id === player.id)) {
+                  console.warn("Already in winners list");
+                  return;
+              }
+              player.status = 'WINNER';
+              this.room.winnersFound++;
+              this.room.results.winners.push(player);
+              this.room.lastActionMessage = `${player.nickname} WON!`;
+          } else {
+              this.room.lastActionMessage = `${player.nickname} NO PRIZE.`;
+          }
+
+          if (this.room.winnersFound >= this.room.config.numWinners) {
+              this.transitionPhase('RESULTS');
+              return;
+          }
+      }
+
+      // Advance unless transition happened
+      const transitioning = (this.room.phase === 'GAME_LOSER_ROUND' && hit && this.room.losersFound >= this.room.config.numLosers) ||
+                            (this.room.phase === 'GAME_WINNER_ROUND' && hit && this.room.winnersFound >= this.room.config.numWinners);
+                            
+      if (this.room.phase !== 'RESULTS' && !transitioning) {
+         this.advanceTurn();
+      } else {
+          this.notify();
+      }
   }
 
   private advanceTurn() {
       if (!this.room) return;
-      let nextIndex = (this.room.currentTurnIndex + 1) % this.room.players.length;
-      let loopCount = 0;
-      while (
-          (this.room.players[nextIndex].status === 'ELIMINATED' || this.room.players[nextIndex].status === 'WINNER') 
-          && loopCount < this.room.players.length
-      ) {
-          nextIndex = (nextIndex + 1) % this.room.players.length;
-          loopCount++;
-      }
-      this.room.currentTurnIndex = nextIndex;
-      this.initTurn();
+      this.room.currentTurnIndex = (this.room.currentTurnIndex + 1) % this.room.players.length;
+      this.ensureValidPlayer();
+      this.prepareTurn();
   }
 
   private transitionPhase(phase: MultiplayerRoom['phase']) {
@@ -285,7 +355,8 @@ export class MockGameService implements IGameService {
               this.room.results.survivors = this.room.players.filter(p => p.status === 'PLAYING' || p.status === 'SAFE' || p.status === 'WAITING');
           } else {
               this.room.currentTurnIndex = 0;
-              this.initTurn();
+              // Reset cycle to find first valid player
+              this.startPhase(); // Logic moved inside startPhase to handle validation
           }
           this.notify();
       }, 3000);
@@ -302,7 +373,6 @@ export class MockGameService implements IGameService {
 
   private botLoop() {
       if (!this.room) return;
-      // Bot logic simplified
       if (this.room.phase === 'LOBBY' && this.room.players.length < this.room.config.maxPlayers) {
           if (Math.random() > 0.7) return; 
           const bot: Player = {
@@ -315,13 +385,17 @@ export class MockGameService implements IGameService {
           this.room.players.push(bot);
           this.notify();
       }
-      if (this.room.phase.includes('GAME') && !this.room.turnResult) {
+      if (this.room.phase.includes('GAME') && !this.room.turnResult && !this.room.isProcessing) {
           const activePlayer = this.room.players[this.room.currentTurnIndex];
-          if (activePlayer.id === this.playerId) return; 
-          if (this.room.lastActionMessage?.includes('SPINNING') || this.room.lastActionMessage?.includes('TAMPERING')) return;
-          this.room.lastActionMessage = `${activePlayer.nickname} IS SPINNING...`;
-          this.notify();
-          setTimeout(() => this.spin(), 1000);
+          if (activePlayer.id === this.playerId) return; // My turn, don't bot
+          
+          // FIX: Don't act if eliminated or winner
+          if (activePlayer.status === 'ELIMINATED' || activePlayer.status === 'WINNER') return;
+
+          if (Math.random() > 0.3) {
+             // Bot just calls spin() and lets the new async logic handle delays
+             this.spin();
+          }
       }
   }
 }

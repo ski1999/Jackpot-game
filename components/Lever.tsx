@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { soundEngine } from '../audio';
@@ -7,6 +8,7 @@ interface LeverProps {
   onPull: () => void;
   disabled: boolean;
   speed: SpinSpeed;
+  className?: string; // Allow overriding position
 }
 
 const LEVER_PARAMS: Record<SpinSpeed, { resetDelay: number; stiffness: number; damping: number }> = {
@@ -15,7 +17,7 @@ const LEVER_PARAMS: Record<SpinSpeed, { resetDelay: number; stiffness: number; d
   SLOW: { resetDelay: 1200, stiffness: 50, damping: 20 },
 };
 
-export const Lever: React.FC<LeverProps> = ({ onPull, disabled, speed }) => {
+export const Lever: React.FC<LeverProps> = ({ onPull, disabled, speed, className }) => {
   const [pulled, setPulled] = useState(false);
   const params = LEVER_PARAMS[speed];
 
@@ -30,8 +32,11 @@ export const Lever: React.FC<LeverProps> = ({ onPull, disabled, speed }) => {
     setTimeout(() => setPulled(false), params.resetDelay);
   };
 
+  // Default positioning if no className provided
+  const positionClasses = className || "absolute top-[180px] -right-[45px] xs:top-[220px] xs:-right-[60px] md:top-[280px] md:-right-[80px] scale-75 md:scale-100 origin-top-right";
+
   return (
-    <div className="absolute top-[280px] -right-[80px] w-24 h-64 z-20 flex items-center pointer-events-auto select-none">
+    <div className={`${positionClasses} w-24 h-64 z-20 flex items-center pointer-events-auto select-none`}>
       
       {/* Base - Rusted Metal */}
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-32 bg-zinc-800 border-r-4 border-black shadow-xl" 

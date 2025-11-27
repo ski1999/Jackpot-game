@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Volume2, VolumeX, Gauge, BookOpen } from 'lucide-react';
+import { X, Volume2, VolumeX, Gauge, BookOpen, Copy, Check } from 'lucide-react';
 import { SpinSpeed, GameSettings } from '../types';
+import { useGame } from '../contexts/GameContext';
 
 interface SettingsPanelProps {
   settings: GameSettings;
@@ -11,6 +12,18 @@ interface SettingsPanelProps {
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onClose }) => {
+  const { playerId } = useGame();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyId = () => {
+    // Attempt to parse out the real persistent UUID if available, or fallback to the session ID
+    // In production, playerId might be just the session ID if no persistence
+    // But our GameContext provides the best ID available.
+    navigator.clipboard.writeText(playerId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -21,7 +34,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       <motion.div 
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
-        className="bg-zinc-900 border-2 border-green-700 p-6 max-w-sm w-full shadow-[0_0_20px_rgba(0,255,0,0.1)] relative"
+        className="bg-zinc-900 border-2 border-green-700 p-6 max-w-sm w-full shadow-[0_0_20px_rgba(0,255,0,0.1)] relative max-h-[90vh] overflow-y-auto"
       >
         <button 
           onClick={onClose}
@@ -35,6 +48,26 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </h2>
 
         <div className="space-y-6">
+          
+          {/* Employee ID (Persistence) */}
+          <div className="space-y-2 bg-black p-3 border border-zinc-800">
+             <label className="text-[10px] text-zinc-500 font-mono uppercase block">Employee ID Badge</label>
+             <div className="flex items-center gap-2">
+                <code className="flex-1 bg-zinc-900 p-2 text-xs text-green-600 font-mono truncate border border-zinc-700 select-all">
+                  {playerId || "GENERATING..."}
+                </code>
+                <button 
+                  onClick={handleCopyId}
+                  className="p-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-400 hover:text-white"
+                >
+                  {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                </button>
+             </div>
+             <p className="text-[10px] text-zinc-600">
+               Save this ID to recover your stats on another device.
+             </p>
+          </div>
+
           {/* Volume Control */}
           <div className="space-y-2">
              <label className="text-xs text-green-700 font-mono uppercase block">Audio Output Level</label>

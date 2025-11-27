@@ -100,17 +100,14 @@ wss.on('connection', (ws: WebSocket) => {
           currentNickname = payload.nickname;
           currentPlayerId = socketId;
           
-          // Check if client sent a stored token (UUID)
           if (payload.token) {
               persistentUserId = payload.token;
               console.log(`User returned with ID: ${persistentUserId}`);
           } else {
-              // Generate new persistent ID
               persistentUserId = randomUUID();
               console.log(`New user assigned ID: ${persistentUserId}`);
           }
 
-          // Send back Identity with the UUID so client can save it
           ws.send(JSON.stringify({ 
               type: 'IDENTITY', 
               id: currentPlayerId,
@@ -138,7 +135,8 @@ wss.on('connection', (ws: WebSocket) => {
              winnersFound: 0,
              results: { losers: [], winners: [], survivors: [] },
              currentWires: [],
-             currentProb: 0
+             currentProb: 0,
+             isProcessing: false
           };
           await db.createRoom(newRoom);
           broadcastRoomUpdate(config.roomCode);
@@ -190,40 +188,68 @@ wss.on('connection', (ws: WebSocket) => {
              const room = await db.findRoomByPlayerSocket(socketId);
              if (!room || room.players[room.currentTurnIndex].socketId !== socketId) return;
              
-             const reactionTime = room.turnStartTime ? Date.now() - room.turnStartTime : 0;
+             // Guard: Block if action already in progress
+             if (room.isProcessing) return;
+
              const player = room.players[room.currentTurnIndex];
+             // Guard: Block if player is eliminated or winner
+             if (player.status === 'ELIMINATED' || player.status === 'WINNER') return;
 
-             const result = GameLogic.handleSpin(room);
-             room.turnResult = { hit: result.hit };
-
-             telemetry.recordEvent({
-                 timestamp: new Date().toISOString(),
-                 roomId: room.config.roomCode,
-                 playerId: player.userId || player.id, // Use Persistent ID for logs
-                 nickname: player.nickname,
-                 roundPhase: room.phase,
-                 action: 'SPIN',
-                 reactionTimeMs: reactionTime,
-                 outcome: result.hit ? 'HIT' : 'SAFE'
-             });
+             room.isProcessing = true; // LOCK
+             room.lastActionMessage = `${player.nickname} IS SPINNING...`;
              
+             // Broadcast 'SPINNING' state first
              await db.updateRoom(room.config.roomCode, room);
              broadcastRoomUpdate(room.config.roomCode);
-
+             
+             const reactionTime = room.turnStartTime ? Date.now() - room.turnStartTime : 0;
+             
+             // Wait for animation (2s)
              setTimeout(async () => {
                  const r = await db.getRoom(room.config.roomCode);
-                 if (r) {
-                     GameLogic.processTurnResult(r, result.hit);
-                     r.turnResult = undefined;
-                     
-                     if (r.phase === 'RESULTS' && statsDb && !r.statsRecorded) {
-                        statsDb.recordGameStats(r);
-                     }
+                 if (!r) return;
+                 
+                 const result = GameLogic.handleSpin(r);
+                 r.turnResult = { hit: result.hit };
+                 
+                 telemetry.recordEvent({
+                     timestamp: new Date().toISOString(),
+                     roomId: r.config.roomCode,
+                     playerId: player.userId || player.id, 
+                     nickname: player.nickname,
+                     roundPhase: r.phase,
+                     action: 'SPIN',
+                     reactionTimeMs: reactionTime,
+                     outcome: result.hit ? 'HIT' : 'SAFE'
+                 });
 
-                     await db.updateRoom(r.config.roomCode, r);
-                     broadcastRoomUpdate(r.config.roomCode);
-                 }
-             }, 3000);
+                 // Broadcast Result
+                 await db.updateRoom(r.config.roomCode, r);
+                 broadcastRoomUpdate(r.config.roomCode);
+
+                 // Wait for Result Display (3s)
+                 setTimeout(async () => {
+                     const r2 = await db.getRoom(r.config.roomCode);
+                     if (r2) {
+                         console.log(`Processing Turn End. Hit: ${result.hit}`);
+                         GameLogic.processTurnResult(r2, result.hit);
+                         
+                         // Debug Logs
+                         console.log("Losers:", r2.results.losers.map(l => l.nickname));
+                         console.log("Winners:", r2.results.winners.map(w => w.nickname));
+
+                         r2.turnResult = undefined;
+                         r2.isProcessing = false; // UNLOCK
+                         
+                         if (r2.phase === 'RESULTS' && statsDb && !r2.statsRecorded) {
+                            statsDb.recordGameStats(r2);
+                         }
+
+                         await db.updateRoom(r2.config.roomCode, r2);
+                         broadcastRoomUpdate(r2.config.roomCode);
+                     }
+                 }, 3000);
+             }, 2000);
           }
           break;
 
@@ -232,8 +258,15 @@ wss.on('connection', (ws: WebSocket) => {
              const room = await db.findRoomByPlayerSocket(socketId);
              if (!room || room.players[room.currentTurnIndex].socketId !== socketId) return;
 
-             const reactionTime = room.turnStartTime ? Date.now() - room.turnStartTime : 0;
+             // Guard: Block if action already in progress
+             if (room.isProcessing) return;
+
              const player = room.players[room.currentTurnIndex];
+             // Guard: Block if player is eliminated or winner
+             if (player.status === 'ELIMINATED' || player.status === 'WINNER') return;
+
+             room.isProcessing = true; // LOCK
+             const reactionTime = room.turnStartTime ? Date.now() - room.turnStartTime : 0;
              
              const result = GameLogic.handleWireCut(room, payload.wireId);
              if (result) {
@@ -261,6 +294,7 @@ wss.on('connection', (ws: WebSocket) => {
                          if (r) {
                              GameLogic.processTurnResult(r, true);
                              r.turnResult = undefined;
+                             r.isProcessing = false; // UNLOCK
 
                              if (r.phase === 'RESULTS' && statsDb && !r.statsRecorded) {
                                 statsDb.recordGameStats(r);
@@ -272,9 +306,24 @@ wss.on('connection', (ws: WebSocket) => {
                      }, 3000);
 
                  } else {
+                     // SAFE CUT: Advance turn after short delay
+                     room.lastActionMessage = "WIRE BYPASSED. SAFE.";
                      await db.updateRoom(room.config.roomCode, room);
                      broadcastRoomUpdate(room.config.roomCode);
+
+                     setTimeout(async () => {
+                        const r = await db.getRoom(room.config.roomCode);
+                        if (r) {
+                            // Turn ends, proceed to next player (outcome = false means no elimination/win yet)
+                            GameLogic.processTurnResult(r, false);
+                            r.isProcessing = false; // UNLOCK
+                            await db.updateRoom(r.config.roomCode, r);
+                            broadcastRoomUpdate(r.config.roomCode);
+                        }
+                     }, 2000); // 2 second delay to show "SAFE"
                  }
+             } else {
+                 room.isProcessing = false; // Release lock if invalid move
              }
           }
           break;

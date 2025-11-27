@@ -1,4 +1,5 @@
 
+
 export type WireStatus = 'intact' | 'cut';
 
 export interface Wire {
@@ -47,6 +48,7 @@ export interface MultiplayerRoom {
   currentWires?: Wire[];
   turnResult?: { hit: boolean };
   statsRecorded?: boolean;
+  isProcessing?: boolean;
   
   // Telemetry Helpers
   turnStartTime?: number;

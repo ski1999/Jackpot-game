@@ -79,4 +79,5 @@ export interface MultiplayerRoom {
   turnResult?: { hit: boolean };
   statsRecorded?: boolean;
   turnStartTime?: number;
+  isProcessing?: boolean; // Lock flag to prevent race conditions
 }

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { SlotSymbol, SpinSpeed } from '../types';
@@ -29,19 +30,8 @@ export const Reel: React.FC<ReelProps> = ({ spinning, targetSymbol, delay, symbo
     }
   }, [spinning, targetSymbol]);
 
-  // Sound effect trigger for reel stop
-  useEffect(() => {
-    if (!spinning && targetSymbol) {
-       // Only play if this specific reel just stopped
-       // Since spinning prop changes for all, we rely on the parent delay logic usually,
-       // but here we can't easily sync audio perfectly without more complex logic.
-       // Instead, App.tsx manages the stop logic.
-       // However, we can do a visual "tick" sound while spinning if needed, but App does "whirring".
-    }
-  }, [spinning, targetSymbol]);
-
   return (
-    <div className="relative w-20 h-28 md:w-24 md:h-32 bg-black border-2 border-zinc-800 overflow-hidden flex flex-col items-center justify-center reel-shadow">
+    <div className="relative w-16 h-24 xs:w-20 xs:h-28 md:w-24 md:h-32 bg-black border-2 border-zinc-800 overflow-hidden flex flex-col items-center justify-center reel-shadow">
       {/* Dirty glass overlay */}
       <div className="absolute inset-0 pointer-events-none z-10 reel-shadow bg-gradient-to-b from-black/60 via-transparent to-black/60"></div>
       
@@ -58,7 +48,9 @@ export const Reel: React.FC<ReelProps> = ({ spinning, targetSymbol, delay, symbo
           {reelSymbols.map((s, i) => (
             <div key={i} className={`h-16 flex items-center justify-center opacity-70`}>
               {s.shape ? (
-                <PixelSymbol shape={s.shape} color={s.color} size={48} />
+                <div className="scale-75 md:scale-100">
+                    <PixelSymbol shape={s.shape} color={s.color} size={48} />
+                </div>
               ) : (
                 <div className={`text-4xl ${s.color}`}>{s.char}</div>
               )}
@@ -74,9 +66,11 @@ export const Reel: React.FC<ReelProps> = ({ spinning, targetSymbol, delay, symbo
           className={`flex items-center justify-center drop-shadow-[0_0_10px_currentColor]`}
         >
           {finalSymbol.shape ? (
-             <PixelSymbol shape={finalSymbol.shape} color={finalSymbol.color} size={64} />
+             <div className="scale-[0.6] xs:scale-75 md:scale-100 transform-gpu">
+                <PixelSymbol shape={finalSymbol.shape} color={finalSymbol.color} size={64} />
+             </div>
           ) : (
-             <div className={`text-6xl ${finalSymbol.color}`}>{finalSymbol.char}</div>
+             <div className={`text-4xl md:text-6xl ${finalSymbol.color}`}>{finalSymbol.char}</div>
           )}
         </motion.div>
       )}
