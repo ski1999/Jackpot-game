@@ -1,11 +1,12 @@
--- Enable UUID extension if needed for other features, though not strictly required for this table
+-- Enable UUID extension if needed
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Table: user_stats
 -- Stores aggregate gameplay statistics for players.
--- Nickname is used as the unique identifier (Primary Key) for simplicity in this arcade style game.
+-- user_id (UUID) is the primary key to allow nickname changes and anonymity.
 CREATE TABLE IF NOT EXISTS user_stats (
-    nickname VARCHAR(50) PRIMARY KEY,
+    user_id UUID PRIMARY KEY,
+    nickname VARCHAR(50),
     games_played INTEGER DEFAULT 0,
     wins INTEGER DEFAULT 0,
     losses INTEGER DEFAULT 0,
