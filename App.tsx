@@ -50,6 +50,8 @@ const GameRouter = () => {
 
   const handleStartMultiplayer = () => {
     if (nickname) {
+        // Service now handles checking localStorage for token automatically
+        // inside SocketGameService implementation
         service.connect(nickname);
         setScreen('MULTI_MENU');
     } else {

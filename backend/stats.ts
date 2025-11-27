@@ -1,5 +1,6 @@
+
 import pg from 'pg';
-import { MultiplayerRoom } from './types';
+import { MultiplayerRoom, Player } from './types';
 
 const { Pool } = pg;
 
@@ -24,48 +25,38 @@ export class StatsDatabase {
     try {
       await client.query('BEGIN');
 
-      // Process Losers
+      // Helper to upsert stats
+      // Uses user_id as key, but updates nickname to the latest one used
+      const upsertStats = async (player: Player, win: boolean, loss: boolean) => {
+          if (!player.userId) return; // Skip if no persistent ID (shouldn't happen in prod)
+
+          await client.query(`
+            INSERT INTO user_stats (user_id, nickname, games_played, wins, losses, last_played_at)
+            VALUES ($1, $2, 1, $3, $4, NOW())
+            ON CONFLICT (user_id) 
+            DO UPDATE SET 
+              nickname = $2,
+              games_played = user_stats.games_played + 1,
+              wins = user_stats.wins + $3,
+              losses = user_stats.losses + $4,
+              last_played_at = NOW();
+          `, [player.userId, player.nickname, win ? 1 : 0, loss ? 1 : 0]);
+      };
+
       for (const player of room.results.losers) {
-        await client.query(`
-          INSERT INTO user_stats (nickname, games_played, losses, last_played_at)
-          VALUES ($1, 1, 1, NOW())
-          ON CONFLICT (nickname) 
-          DO UPDATE SET 
-            games_played = user_stats.games_played + 1,
-            losses = user_stats.losses + 1,
-            last_played_at = NOW();
-        `, [player.nickname]);
+          await upsertStats(player, false, true);
       }
 
-      // Process Winners
       for (const player of room.results.winners) {
-        await client.query(`
-          INSERT INTO user_stats (nickname, games_played, wins, last_played_at)
-          VALUES ($1, 1, 1, NOW())
-          ON CONFLICT (nickname) 
-          DO UPDATE SET 
-            games_played = user_stats.games_played + 1,
-            wins = user_stats.wins + 1,
-            last_played_at = NOW();
-        `, [player.nickname]);
+          await upsertStats(player, true, false);
       }
 
-      // Process Survivors (Participants who didn't win or lose specifically)
-      // Note: Logic might vary if you consider everyone else a loser or just a participant.
-      // Here we count them as just played.
       for (const player of room.results.survivors) {
-        // Ensure we don't double count if they somehow ended up in multiple lists (unlikely)
-        if (room.results.winners.find(w => w.id === player.id)) continue;
-        if (room.results.losers.find(l => l.id === player.id)) continue;
-
-        await client.query(`
-          INSERT INTO user_stats (nickname, games_played, last_played_at)
-          VALUES ($1, 1, NOW())
-          ON CONFLICT (nickname) 
-          DO UPDATE SET 
-            games_played = user_stats.games_played + 1,
-            last_played_at = NOW();
-        `, [player.nickname]);
+          // Double check they aren't already processed
+          if (room.results.winners.some(w => w.id === player.id)) continue;
+          if (room.results.losers.some(l => l.id === player.id)) continue;
+          
+          await upsertStats(player, false, false);
       }
 
       await client.query('COMMIT');

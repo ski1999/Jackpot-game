@@ -1,3 +1,4 @@
+
 import { MultiplayerRoom, Player, Wire } from './types';
 
 const WIRE_COLORS = [
@@ -43,6 +44,9 @@ export class GameLogic {
   static initTurn(room: MultiplayerRoom) {
       const player = room.players[room.currentTurnIndex];
       room.lastActionMessage = `${player.nickname}'S TURN`;
+      
+      // TELEMETRY: Track when the turn started
+      room.turnStartTime = Date.now();
 
       // 1. Set Prob
       room.currentProb = room.phase === 'GAME_LOSER_ROUND' ? 0.10 : 0.15;

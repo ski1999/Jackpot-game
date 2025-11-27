@@ -1,3 +1,4 @@
+
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import { MemoryDatabase, RedisDatabase } from './database';
@@ -7,8 +8,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { StatsDatabase } from './stats';
+import { TelemetryService } from './telemetry';
+import { randomUUID } from 'crypto';
 
-// Fix for __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -16,14 +18,8 @@ const PORT = process.env.PORT || 8080;
 const USE_REDIS = process.env.USE_REDIS === 'true';
 const USE_POSTGRES = process.env.USE_POSTGRES === 'true';
 
-// 1. Create HTTP Server (Serves Frontend + Upgrades WS)
 const server = createServer((req, res) => {
-  // Serve static files from dist/ directory (Built React App)
-  // In Docker, we copy dist to the root /app/dist, and this script runs from /app/backend
-  // So ../dist is correct.
   const distPath = path.join(__dirname, '../dist');
-  
-  // Sanitize path (basic)
   const safePath = path.normalize(req.url || '/').replace(/^(\.\.[\/\\])+/, '');
   let filePath = path.join(distPath, safePath === '/' ? 'index.html' : safePath);
 
@@ -41,7 +37,6 @@ const server = createServer((req, res) => {
   fs.readFile(filePath, (error, content) => {
       if (error) {
           if (error.code === 'ENOENT') {
-              // SPA Fallback: If file not found (e.g. /game), serve index.html
               fs.readFile(path.join(distPath, 'index.html'), (err, fallbackContent) => {
                   if (err) {
                       res.writeHead(500);
@@ -65,10 +60,10 @@ const server = createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 const db = USE_REDIS ? new RedisDatabase() : new MemoryDatabase();
 const statsDb = USE_POSTGRES ? new StatsDatabase() : null;
+const telemetry = new TelemetryService();
 
 console.log(`Faz-Slots Backend running on port ${PORT} (Redis: ${USE_REDIS}, Postgres: ${USE_POSTGRES})`);
 
-// Helper to broadcast room state to all players in that room
 const broadcastRoomUpdate = async (roomCode: string) => {
   const room = await db.getRoom(roomCode);
   if (!room) return;
@@ -91,6 +86,7 @@ wss.on('connection', (ws: WebSocket) => {
   (ws as any).id = socketId;
   let currentPlayerId: string | null = null;
   let currentNickname: string = 'Anonymous';
+  let persistentUserId: string | null = null;
 
   console.log(`New client: ${socketId}`);
 
@@ -103,13 +99,30 @@ wss.on('connection', (ws: WebSocket) => {
         case 'AUTH':
           currentNickname = payload.nickname;
           currentPlayerId = socketId;
-          ws.send(JSON.stringify({ type: 'IDENTITY', id: currentPlayerId }));
+          
+          // Check if client sent a stored token (UUID)
+          if (payload.token) {
+              persistentUserId = payload.token;
+              console.log(`User returned with ID: ${persistentUserId}`);
+          } else {
+              // Generate new persistent ID
+              persistentUserId = randomUUID();
+              console.log(`New user assigned ID: ${persistentUserId}`);
+          }
+
+          // Send back Identity with the UUID so client can save it
+          ws.send(JSON.stringify({ 
+              type: 'IDENTITY', 
+              id: currentPlayerId,
+              userId: persistentUserId 
+          }));
           break;
 
         case 'CREATE_ROOM':
           const config = payload as MultiplayerConfig;
           const host: Player = {
              id: currentPlayerId!,
+             userId: persistentUserId!,
              nickname: currentNickname,
              isHost: true,
              status: 'WAITING',
@@ -149,6 +162,7 @@ wss.on('connection', (ws: WebSocket) => {
           
           const newPlayer: Player = {
              id: currentPlayerId!,
+             userId: persistentUserId!,
              nickname: currentNickname,
              isHost: false,
              status: 'WAITING',
@@ -176,8 +190,22 @@ wss.on('connection', (ws: WebSocket) => {
              const room = await db.findRoomByPlayerSocket(socketId);
              if (!room || room.players[room.currentTurnIndex].socketId !== socketId) return;
              
+             const reactionTime = room.turnStartTime ? Date.now() - room.turnStartTime : 0;
+             const player = room.players[room.currentTurnIndex];
+
              const result = GameLogic.handleSpin(room);
              room.turnResult = { hit: result.hit };
+
+             telemetry.recordEvent({
+                 timestamp: new Date().toISOString(),
+                 roomId: room.config.roomCode,
+                 playerId: player.userId || player.id, // Use Persistent ID for logs
+                 nickname: player.nickname,
+                 roundPhase: room.phase,
+                 action: 'SPIN',
+                 reactionTimeMs: reactionTime,
+                 outcome: result.hit ? 'HIT' : 'SAFE'
+             });
              
              await db.updateRoom(room.config.roomCode, room);
              broadcastRoomUpdate(room.config.roomCode);
@@ -203,13 +231,27 @@ wss.on('connection', (ws: WebSocket) => {
           {
              const room = await db.findRoomByPlayerSocket(socketId);
              if (!room || room.players[room.currentTurnIndex].socketId !== socketId) return;
+
+             const reactionTime = room.turnStartTime ? Date.now() - room.turnStartTime : 0;
+             const player = room.players[room.currentTurnIndex];
              
              const result = GameLogic.handleWireCut(room, payload.wireId);
              if (result) {
                  room.lastActionMessage = "CUTTING WIRE...";
+
+                 telemetry.recordEvent({
+                     timestamp: new Date().toISOString(),
+                     roomId: room.config.roomCode,
+                     playerId: player.userId || player.id,
+                     nickname: player.nickname,
+                     roundPhase: room.phase,
+                     action: 'CUT_WIRE',
+                     targetId: payload.wireId.toString(),
+                     reactionTimeMs: reactionTime,
+                     outcome: result.hit ? 'HIT' : 'ODDS_CHANGE'
+                 });
                  
                  if (result.hit) {
-                     // Boom
                      room.turnResult = { hit: true };
                      await db.updateRoom(room.config.roomCode, room);
                      broadcastRoomUpdate(room.config.roomCode);
@@ -230,7 +272,6 @@ wss.on('connection', (ws: WebSocket) => {
                      }, 3000);
 
                  } else {
-                     // Safe
                      await db.updateRoom(room.config.roomCode, room);
                      broadcastRoomUpdate(room.config.roomCode);
                  }

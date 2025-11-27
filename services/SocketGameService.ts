@@ -5,7 +5,6 @@ import { CONFIG } from '../config';
 
 /**
  * Production implementation using WebSockets.
- * This is a skeleton to be connected to a real backend (Node.js/Socket.io/Go/etc).
  */
 export class SocketGameService implements IGameService {
   private socket: WebSocket | null = null;
@@ -13,14 +12,18 @@ export class SocketGameService implements IGameService {
   private listeners: GameListener[] = [];
   private errorListeners: ErrorListener[] = [];
   private playerId: string = '';
+  private persistentToken: string | null = null;
 
   constructor() {
     console.log("Initializing Production Socket Service...");
+    // Load persisted token on init
+    if (typeof window !== 'undefined') {
+        this.persistentToken = localStorage.getItem('faz_token');
+    }
   }
 
   subscribe(listener: GameListener) {
     this.listeners.push(listener);
-    // Return unsubscribe
     return () => { this.listeners = this.listeners.filter(l => l !== listener); };
   }
 
@@ -30,13 +33,18 @@ export class SocketGameService implements IGameService {
   }
 
   connect(nickname: string) {
-    // 1. Establish WS Connection
     this.socket = new WebSocket(CONFIG.SOCKET_URL);
     
     this.socket.onopen = () => {
         console.log("Connected to Game Server");
-        // Send handshake / auth
-        this.socket?.send(JSON.stringify({ type: 'AUTH', nickname }));
+        // Send handshake with existing token if we have one
+        this.socket?.send(JSON.stringify({ 
+            type: 'AUTH', 
+            payload: {
+                nickname,
+                token: this.persistentToken // Send the saved UUID
+            }
+        }));
     };
 
     this.socket.onmessage = (event) => {
@@ -59,7 +67,12 @@ export class SocketGameService implements IGameService {
               this.notifyError(data.message);
               break;
           case 'IDENTITY':
-              this.playerId = data.id;
+              this.playerId = data.id; // Session ID
+              if (data.userId) {
+                  // Server sent back our Persistent ID (either confirmed old one or generated new one)
+                  this.persistentToken = data.userId;
+                  localStorage.setItem('faz_token', data.userId);
+              }
               break;
       }
   }

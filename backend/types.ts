@@ -1,3 +1,4 @@
+
 export type WireStatus = 'intact' | 'cut';
 
 export interface Wire {
@@ -11,7 +12,8 @@ export interface Wire {
 export type PlayerStatus = 'WAITING' | 'PLAYING' | 'SAFE' | 'ELIMINATED' | 'WINNER';
 
 export interface Player {
-  id: string;
+  id: string;        // Session ID (Socket ID or random for frontend key)
+  userId?: string;   // Persistent ID (UUID from LocalStorage/DB)
   nickname: string;
   isHost: boolean;
   status: PlayerStatus;
@@ -45,4 +47,19 @@ export interface MultiplayerRoom {
   currentWires?: Wire[];
   turnResult?: { hit: boolean };
   statsRecorded?: boolean;
+  
+  // Telemetry Helpers
+  turnStartTime?: number;
+}
+
+export interface GameTelemetry {
+  timestamp: string;
+  roomId: string;
+  playerId: string;
+  nickname: string;
+  roundPhase: string;
+  action: 'SPIN' | 'CUT_WIRE';
+  targetId?: string; // Wire ID if cut
+  reactionTimeMs: number;
+  outcome: 'HIT' | 'SAFE' | 'ELIMINATED' | 'WINNER' | 'ODDS_CHANGE';
 }

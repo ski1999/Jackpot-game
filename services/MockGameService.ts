@@ -1,8 +1,7 @@
 
 import { IGameService, GameListener, ErrorListener } from './IGameService';
 import { MultiplayerConfig, MultiplayerRoom, Player, Wire } from '../types';
-import { MOCK_BOT_NAMES, WIRE_COLORS, SYMBOL_SETS } from '../constants';
-import { soundEngine } from '../audio';
+import { MOCK_BOT_NAMES, WIRE_COLORS } from '../constants';
 
 export class MockGameService implements IGameService {
   private room: MultiplayerRoom | null = null;
@@ -13,7 +12,6 @@ export class MockGameService implements IGameService {
   
   // Simulation Intervals
   private botInterval: any = null;
-  private stateTimeout: any = null;
 
   constructor() {
     this.playerId = 'p-' + Date.now();
@@ -42,7 +40,6 @@ export class MockGameService implements IGameService {
 
   private notifyError(msg: string) {
     this.errorListeners.forEach(l => l(msg));
-    // Clear error after 3s
     setTimeout(() => this.errorListeners.forEach(l => l(null)), 3000);
   }
 
@@ -50,7 +47,13 @@ export class MockGameService implements IGameService {
 
   connect(nickname: string) {
     this.nickname = nickname;
-    this.playerId = 'p-' + Date.now(); // Reset ID on connect
+    this.playerId = 'p-' + Date.now(); // Reset ID on connect for mock
+    
+    // Simulate checking local storage in mock
+    const existing = localStorage.getItem('faz_mock_token');
+    if (!existing) {
+        localStorage.setItem('faz_mock_token', 'mock-uuid-' + Date.now());
+    }
   }
 
   getCurrentRoom() {
@@ -80,7 +83,6 @@ export class MockGameService implements IGameService {
       losersFound: 0,
       winnersFound: 0,
       results: { losers: [], winners: [], survivors: [] },
-      // Mock specific state
       currentWires: [],
       currentProb: 0,
       lastActionMessage: 'WAITING FOR PLAYERS...'
@@ -91,9 +93,6 @@ export class MockGameService implements IGameService {
   }
 
   async joinRoom(code: string, password?: string): Promise<void> {
-    // In Mock mode, we simulate joining a room by creating a fake one if it doesn't exist
-    // or joining the current one if code matches.
-    
     if (this.room && this.room.config.roomCode === code) {
         if (this.room.config.password && this.room.config.password !== password) {
             this.notifyError("INVALID PASSWORD");
@@ -115,7 +114,6 @@ export class MockGameService implements IGameService {
         return;
     }
 
-    // Simulate joining a remote room (Create a fake state)
     const fakeConfig: MultiplayerConfig = { 
        roomCode: code, maxPlayers: 5, numLosers: 1, numWinners: 1 
     };
@@ -159,8 +157,6 @@ export class MockGameService implements IGameService {
 
   spin() {
      if (!this.room) return;
-     
-     // Determine outcome based on prob
      const hit = Math.random() < (this.room.currentProb || 0.1);
      this.handleTurnResult(hit);
   }
@@ -171,14 +167,11 @@ export class MockGameService implements IGameService {
       const wire = this.room.currentWires.find(w => w.id === wireId);
       if (!wire || wire.status === 'cut') return;
 
-      // Update state
       wire.status = 'cut';
       
       if (wire.isBomb) {
-          // Trap triggered
-          this.handleTurnResult(true); // Instant hit
+          this.handleTurnResult(true);
       } else {
-          // Safe - Increase prob
           this.room.currentProb = Math.min(0.99, (this.room.currentProb || 0.1) * wire.multiplier);
           this.notify();
       }
@@ -188,14 +181,11 @@ export class MockGameService implements IGameService {
 
   private initTurn() {
       if (!this.room) return;
-      
       const player = this.room.players[this.room.currentTurnIndex];
       this.room.lastActionMessage = `${player.nickname}'S TURN`;
-
-      // 1. Set Prob
+      this.room.turnStartTime = Date.now();
       this.room.currentProb = this.room.phase === 'GAME_LOSER_ROUND' ? 0.10 : 0.15;
 
-      // 2. Gen Wires
       const wireCount = 6;
       const newWires: Wire[] = Array.from({ length: wireCount }).map((_, i) => ({
         id: i,
@@ -205,7 +195,6 @@ export class MockGameService implements IGameService {
         multiplier: 1.2 + Math.random() * 0.5, 
       }));
 
-      // 3. Place Traps
       if (this.room.phase === 'GAME_LOSER_ROUND') {
           let bombsPlaced = 0;
           while (bombsPlaced < 2) {
@@ -220,23 +209,20 @@ export class MockGameService implements IGameService {
           newWires[trapIndex].isBomb = true;
       }
       this.room.currentWires = newWires;
-      this.room.turnResult = undefined; // Reset result for animation
+      this.room.turnResult = undefined;
       this.notify();
   }
 
   private handleTurnResult(hit: boolean) {
       if (!this.room) return;
-      
-      // Store result for UI animation (Drawer opening, etc)
       this.room.turnResult = { hit };
-      this.notify(); // UI shows animation
+      this.notify(); 
 
       const player = this.room.players[this.room.currentTurnIndex];
       
-      // Delay for animation duration
       setTimeout(() => {
           if (!this.room) return;
-          this.room.turnResult = undefined; // Clear animation flag
+          this.room.turnResult = undefined; 
 
           if (this.room.phase === 'GAME_LOSER_ROUND') {
               if (hit) {
@@ -276,7 +262,6 @@ export class MockGameService implements IGameService {
       if (!this.room) return;
       let nextIndex = (this.room.currentTurnIndex + 1) % this.room.players.length;
       let loopCount = 0;
-      // Skip eliminated/won players
       while (
           (this.room.players[nextIndex].status === 'ELIMINATED' || this.room.players[nextIndex].status === 'WINNER') 
           && loopCount < this.room.players.length
@@ -306,8 +291,6 @@ export class MockGameService implements IGameService {
       }, 3000);
   }
 
-  // --- Bot Simulation ---
-
   private startBotSimulation() {
       if (this.botInterval) clearInterval(this.botInterval);
       this.botInterval = setInterval(() => this.botLoop(), 2000);
@@ -319,52 +302,26 @@ export class MockGameService implements IGameService {
 
   private botLoop() {
       if (!this.room) return;
-
-      // 1. Add bots in Lobby
+      // Bot logic simplified
       if (this.room.phase === 'LOBBY' && this.room.players.length < this.room.config.maxPlayers) {
-          if (Math.random() > 0.7) return; // Random delay
-          const botName = MOCK_BOT_NAMES[Math.floor(Math.random() * MOCK_BOT_NAMES.length)] + '_' + Math.floor(Math.random()*99);
+          if (Math.random() > 0.7) return; 
           const bot: Player = {
               id: `bot-${Date.now()}-${Math.random()}`,
-              nickname: botName.toUpperCase(),
+              nickname: MOCK_BOT_NAMES[Math.floor(Math.random() * MOCK_BOT_NAMES.length)],
               isHost: false,
               status: 'WAITING',
               avatarId: Math.floor(Math.random() * 6)
           };
           this.room.players.push(bot);
           this.notify();
-          return;
       }
-
-      // 2. Play game
       if (this.room.phase.includes('GAME') && !this.room.turnResult) {
           const activePlayer = this.room.players[this.room.currentTurnIndex];
-          if (activePlayer.id === this.playerId) return; // My turn, do nothing
-
-          // Bot Action
-          // Ensure we don't spam actions
+          if (activePlayer.id === this.playerId) return; 
           if (this.room.lastActionMessage?.includes('SPINNING') || this.room.lastActionMessage?.includes('TAMPERING')) return;
-
-          const hackChance = this.room.phase === 'GAME_LOSER_ROUND' ? 0.2 : 0.6;
-
-          if (Math.random() < hackChance) {
-               // Cut wire
-               if (!this.room.currentWires) return;
-               const intactWires = this.room.currentWires.filter(w => w.status === 'intact');
-               if (intactWires.length > 0) {
-                   const wire = intactWires[Math.floor(Math.random() * intactWires.length)];
-                   this.room.lastActionMessage = `${activePlayer.nickname} IS TAMPERING...`;
-                   this.notify();
-                   setTimeout(() => this.cutWire(wire.id), 1000);
-               } else {
-                   this.spin();
-               }
-          } else {
-               // Spin
-               this.room.lastActionMessage = `${activePlayer.nickname} IS SPINNING...`;
-               this.notify();
-               setTimeout(() => this.spin(), 1000);
-          }
+          this.room.lastActionMessage = `${activePlayer.nickname} IS SPINNING...`;
+          this.notify();
+          setTimeout(() => this.spin(), 1000);
       }
   }
 }
